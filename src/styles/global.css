@@ -21,8 +21,8 @@
   --color-mist-200: #c8c8d2;
   --color-mist-100: #ededf2;
 
-  --color-accent: #7c5cff;
-  --color-accent-soft: #a48bff;
+  --color-accent: #f97316;
+  --color-accent-soft: #fbbf24;
 }
 
 :root {
@@ -101,10 +101,10 @@ input, textarea, select, button, kbd {
   .btn:active { transform: translateY(1px) scale(0.99); }
 
   .btn-primary {
-    background: linear-gradient(180deg, var(--color-accent-soft), var(--color-accent));
-    color: #0c0a18;
+    background: linear-gradient(135deg, var(--color-accent-soft), var(--color-accent));
+    color: #1a1205;
     font-weight: 700;
-    box-shadow: 0 8px 22px -10px rgba(124, 92, 255, 0.8);
+    box-shadow: 0 8px 22px -10px rgba(249, 115, 22, 0.85);
   }
   .btn-primary:hover { filter: brightness(1.06); }
 
@@ -153,7 +153,23 @@ input, textarea, select, button, kbd {
   .field:focus {
     outline: none;
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.18);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.18);
+  }
+
+  /* yellow→orange gradient text for headings */
+  .grad-text {
+    background: linear-gradient(115deg, #fde047 0%, #fbbf24 38%, #f97316 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* dotted dashboard background — white dots on black */
+  .dotted-bg {
+    background-color: #050505;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.18) 1.4px, transparent 1.6px);
+    background-size: 22px 22px;
+    background-position: center;
   }
 
   .label-sm {
@@ -180,6 +196,42 @@ input, textarea, select, button, kbd {
 .animate-pop { animation: pop-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .animate-fade { animation: fade-in 0.2s ease both; }
 .animate-rise { animation: rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* ----------------------------------------------------------------------------
+   Intro splash — logo appears centred, glides left while the title slides out
+   of it to the right, then the whole overlay fades away to reveal the page.
+---------------------------------------------------------------------------- */
+#intro {
+  background:
+    radial-gradient(900px 600px at 50% 40%, #1a1206 0%, transparent 60%),
+    #050505;
+  animation: introOut 0.55s ease 2.1s forwards;
+}
+.intro-logo {
+  animation: introLogo 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.intro-text {
+  transform-origin: left center;
+  white-space: pre;
+  animation: introText 0.75s cubic-bezier(0.22, 1, 0.36, 1) 0.55s both;
+}
+@keyframes introLogo {
+  0% { opacity: 0; transform: scale(0.4) rotate(-8deg); }
+  60% { opacity: 1; transform: scale(1.08) rotate(0deg); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes introText {
+  0% { opacity: 0; transform: translateX(-28px); clip-path: inset(0 100% 0 0); }
+  100% { opacity: 1; transform: translateX(0); clip-path: inset(0 0 0 0); }
+}
+@keyframes introOut {
+  0% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; pointer-events: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #intro { animation: introOut 0.3s ease 0.4s forwards; }
+  .intro-logo, .intro-text { animation: none; }
+}
 
 /* ----------------------------------------------------------------------------
    Mobile — sidebar becomes an off-canvas overlay (< 768px)
@@ -216,6 +268,9 @@ input, textarea, select, button, kbd {
   border-radius: 0.7rem;
   border: 1px solid rgba(255, 255, 255, 0.07);
   tab-size: 2;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 .code-block .tok-keyword   { color: #569cd6; }
 .code-block .tok-control   { color: #c586c0; }
@@ -239,12 +294,4 @@ input, textarea, select, button, kbd {
   text-underline-offset: 2px;
   word-break: break-word;
 }
-.rich-content a:hover { color: #c3b3ff; }
-
-/* On the coloured sticky-note tiles, links inherit the card's dark ink so they
-   stay readable (the full-screen preview keeps the accent colour). */
-.card-tile .rich-content a {
-  color: inherit;
-  text-decoration-thickness: 1px;
-  opacity: 0.85;
-}
+.rich-content a:hover { color: #ffd27a; }

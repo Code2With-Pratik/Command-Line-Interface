@@ -39,6 +39,10 @@ const state = {
   activeBoardId: null as string | null,
 };
 
+// click selection (multi-select; double-click opens the card)
+const selectedCardIds = new Set<string>();
+let cardClickTimer: number | undefined;
+
 /* ============================ dom helpers ========================== */
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const esc = (s: string) =>
@@ -171,6 +175,7 @@ async function api<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
 const ICON = {
   pin: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>',
   star: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 2.8 14 8l5.7.8-4.1 4 1 5.6-5.1-2.7-5.1 2.7 1-5.6-4.1-4L9 8z"/></svg>',
+  starFill: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M11.48 3.05a.6.6 0 0 1 1.04 0l2.4 4.86 5.36.78c.5.07.7.69.34 1.04l-3.88 3.78.92 5.34c.08.5-.45.88-.9.64L12 17.78l-4.8 2.52c-.45.24-.98-.14-.9-.64l.92-5.34-3.88-3.78c-.36-.35-.16-.97.34-1.04l5.36-.78 2.4-4.86Z"/></svg>',
   palette: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.7-.7 1.7-1.6 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H16c3.3 0 6-2.7 6-6 0-4.9-4.5-8-10-8z"/></svg>',
   edit: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
   trash: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
@@ -247,6 +252,13 @@ function renderBoard() {
   const countEl = $('card-count');
   const grid = $('card-grid');
 
+  // drop any selected ids that no longer belong to the active board
+  if (selectedCardIds.size) {
+    const valid = new Set((b?.cards ?? []).map((c) => c.id));
+    for (const id of [...selectedCardIds]) if (!valid.has(id)) selectedCardIds.delete(id);
+  }
+  updateDeleteBtn();
+
   if (!b) {
     titleEl.textContent = 'CLIDesk';
     countEl.textContent = '';
@@ -280,33 +292,25 @@ function renderBoard() {
 
 function cardHtml(c: Card): string {
   const h = hex(c.color);
-  // Sticky-note styling: a soft pastel of the card colour with dark, same-hue ink.
-  const bg = `color-mix(in srgb, ${h} 68%, white)`;
-  const ink = `color-mix(in srgb, ${h} 82%, black)`;       // headings / strong text
-  const inkSoft = `color-mix(in srgb, ${h} 58%, black)`;   // body / secondary
-  const u = state.user;
-  const initial = (u.username || u.email || '?').trim().charAt(0).toUpperCase();
-  return `<article class="card-tile group relative rounded-2xl p-4 min-h-[170px] cursor-pointer animate-rise overflow-hidden flex flex-col"
+  // Coloured border on a dark surface (not a fully coloured card).
+  return `<article class="card-tile group relative rounded-2xl p-4 min-h-[160px] cursor-pointer animate-rise overflow-hidden flex flex-col ${selectedCardIds.has(c.id) ? 'is-selected' : ''}"
       data-card="${c.id}"
-      style="background:${bg};color:${ink};box-shadow:0 14px 34px -16px ${h}, 0 2px 6px -2px rgba(0,0,0,.4);">
-    <div class="flex items-start gap-2 mb-2">
-      <h3 class="font-heading text-xl leading-snug flex-1 min-w-0 break-words" style="color:${ink}">${esc(c.title)}</h3>
+      style="background:linear-gradient(160deg, ${h}14, rgba(15,15,17,.92));border:1.5px solid ${h}80;box-shadow:0 12px 30px -18px ${h}, inset 0 1px 0 ${h}1f;">
+    <span class="absolute left-0 top-0 h-full w-1" style="background:${h}"></span>
+    <div class="flex items-start gap-2 mb-2 pl-1.5">
+      <h3 class="font-heading text-xl leading-snug flex-1 min-w-0 break-words text-mist-100">${esc(c.title)}</h3>
       <div class="flex items-center gap-1.5 shrink-0">
-        ${c.pinned ? `<span style="color:${ink}" title="Pinned">${ICON.pin}</span>` : ''}
-        ${c.favorite ? `<span style="color:#d97706" title="Favourite">${ICON.star}</span>` : ''}
+        ${c.pinned ? `<span style="color:${h}" title="Pinned">${ICON.pin}</span>` : ''}
+        ${c.favorite ? `<span class="drop-shadow" style="color:#fbbf24" title="Favourite">${ICON.starFill}</span>` : ''}
       </div>
     </div>
-    <div class="text-base flex-1 max-h-[150px] overflow-hidden pointer-events-none [mask-image:linear-gradient(180deg,#000_72%,transparent)]" style="color:${inkSoft}">
+    <div class="pl-1.5 pb-1 text-base text-mist-300 flex-1 max-h-[160px] overflow-hidden pointer-events-none [mask-image:linear-gradient(180deg,#000_74%,transparent)]">
       ${renderContent(c)}
     </div>
-    <div class="mt-3 pt-2.5 flex items-center gap-2 border-t" style="border-color:${h}59">
-      <span class="w-6 h-6 rounded-full grid place-items-center text-xs font-heading shrink-0" style="background:${ink};color:${bg}">${esc(initial)}</span>
-      <span class="text-sm truncate" style="color:${inkSoft}">${esc(u.username)}</span>
-      ${c.isCode ? `<span class="ml-auto text-[11px] px-2 py-0.5 rounded-md font-medium" style="background:${h}33;color:${ink}">${esc(c.language)}</span>` : ''}
-    </div>
+    ${c.isCode ? `<span class="absolute bottom-3 right-3 text-[11px] px-2 py-0.5 rounded-md font-medium" style="background:${h}26;color:${h}">${esc(c.language)}</span>` : ''}
     <div class="card-actions absolute top-2.5 right-2.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition" data-stop>
-      <button class="mini-btn act-pin" title="${c.pinned ? 'Unpin' : 'Pin'}" data-card="${c.id}" style="${c.pinned ? `color:#fff` : ''}">${ICON.pin}</button>
-      <button class="mini-btn act-fav" title="${c.favorite ? 'Unfavourite' : 'Favourite'}" data-card="${c.id}" style="${c.favorite ? 'color:#fbbf24' : ''}">${ICON.star}</button>
+      <button class="mini-btn act-pin" title="${c.pinned ? 'Unpin' : 'Pin'}" data-card="${c.id}" style="${c.pinned ? `color:${h}` : ''}">${ICON.pin}</button>
+      <button class="mini-btn act-fav" title="${c.favorite ? 'Unfavourite' : 'Favourite'}" data-card="${c.id}" style="${c.favorite ? 'color:#fbbf24' : ''}">${c.favorite ? ICON.starFill : ICON.star}</button>
       <button class="mini-btn act-color" title="Colour" data-card="${c.id}">${ICON.palette}</button>
       <button class="mini-btn act-edit" title="Edit name" data-card="${c.id}">${ICON.edit}</button>
     </div>
@@ -319,8 +323,10 @@ style.textContent = `
 .mini-btn{display:inline-flex;align-items:center;justify-content:center;width:1.85rem;height:1.85rem;border-radius:.55rem;color:#c8c8d2;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(6px);transition:background .15s,color .15s,transform .1s}
 .mini-btn:hover{background:rgba(0,0,0,.7);color:#fff}
 .mini-btn:active{transform:scale(.9)}
-.card-tile{transition:transform .16s ease, box-shadow .16s ease}
+.card-tile{transition:transform .16s ease, box-shadow .16s ease, outline-color .16s ease}
 .card-tile:hover{transform:translateY(-3px)}
+.card-tile.is-selected{outline:2.5px solid #fff;outline-offset:3px}
+.card-tile.is-selected::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.05);pointer-events:none}
 .swatch{width:1.6rem;height:1.6rem;border-radius:.5rem;cursor:pointer;border:2px solid transparent;transition:transform .1s}
 .swatch:hover{transform:scale(1.12)}
 .swatch[data-active="1"]{border-color:#fff}
@@ -331,6 +337,40 @@ function renderAll() {
   renderUser();
   renderTabs();
   renderBoard();
+}
+
+/* ---------------------- card selection (multi-select) --------------------- */
+function selectCard(id: string) {
+  if (selectedCardIds.has(id)) selectedCardIds.delete(id); // click again to deselect
+  else selectedCardIds.add(id);
+  applySelectionClasses();
+  updateDeleteBtn();
+}
+function applySelectionClasses() {
+  document.querySelectorAll<HTMLElement>('#card-grid .card-tile').forEach((t) =>
+    t.classList.toggle('is-selected', selectedCardIds.has(t.dataset.card!))
+  );
+}
+function clearSelection() {
+  if (!selectedCardIds.size) return;
+  selectedCardIds.clear();
+  applySelectionClasses();
+  updateDeleteBtn();
+}
+function selectedInBoard(): string[] {
+  return [...selectedCardIds].filter((id) => {
+    const f = findCard(id);
+    return !!f && f.board.id === state.activeBoardId;
+  });
+}
+function updateDeleteBtn() {
+  const btn = document.getElementById('delete-card-btn');
+  if (!btn) return;
+  const n = selectedInBoard().length;
+  btn.classList.toggle('hidden', n === 0);
+  const count = document.getElementById('del-count');
+  if (count) count.textContent = n > 1 ? String(n) : '';
+  btn.setAttribute('title', n > 1 ? `Delete ${n} selected cards` : 'Delete selected card');
 }
 
 /* ========================= board actions =========================== */
@@ -438,10 +478,45 @@ async function deleteCard(id: string) {
   try {
     await api(`/api/cards/${id}`, { method: 'DELETE' });
     found.board.cards = found.board.cards.filter((c) => c.id !== id);
+    selectedCardIds.delete(id);
     closeModal();
     renderAll();
     toast('Card deleted');
   } catch (e: any) { toast(e.message, 'err'); }
+}
+
+// Delete all currently-selected cards (from the header Delete button).
+async function deleteSelectedCards() {
+  const ids = selectedInBoard();
+  if (ids.length === 0) return;
+  const ok = await customConfirm({
+    title: ids.length === 1 ? 'Delete card?' : `Delete ${ids.length} cards?`,
+    message:
+      ids.length === 1
+        ? `"${findCard(ids[0])!.card.title}" will be permanently deleted.`
+        : `${ids.length} selected cards will be permanently deleted. This cannot be undone.`,
+    confirmText: 'Delete',
+    danger: true,
+  });
+  if (!ok) return;
+
+  let failed = 0;
+  for (const id of ids) {
+    const found = findCard(id);
+    if (!found) continue;
+    try {
+      await api(`/api/cards/${id}`, { method: 'DELETE' });
+      found.board.cards = found.board.cards.filter((c) => c.id !== id);
+      selectedCardIds.delete(id);
+    } catch {
+      failed++;
+    }
+  }
+  renderAll();
+  toast(
+    failed ? `Deleted with ${failed} error(s)` : ids.length === 1 ? 'Card deleted' : `${ids.length} cards deleted`,
+    failed ? 'err' : 'ok'
+  );
 }
 
 /* ===================== colour & rename popovers ==================== */
@@ -525,7 +600,7 @@ function modalHtml(c: Card): string {
     <!-- header -->
     <header class="flex items-center gap-3 px-5 py-3 border-b border-white/5">
       <span class="w-3 h-3 rounded-full shrink-0" style="background:${h}"></span>
-      <input id="m-title" class="flex-1 min-w-0 bg-transparent font-heading text-2xl outline-none" value="${esc(c.title)}" />
+      <input id="m-title" class="flex-1 min-w-0 bg-transparent font-heading text-2xl outline-none rounded-lg px-3 py-1.5 transition-colors" style="border:1.6px solid ${h}99" value="${esc(c.title)}" />
       <div class="flex items-center gap-2 shrink-0">
         <div class="relative">
           <button id="m-download" class="icon-btn" title="Download">${ICON.download}</button>
@@ -544,24 +619,24 @@ function modalHtml(c: Card): string {
       </select>
       <span class="w-px h-6 bg-white/10 mx-1"></span>
       <button id="m-pin" class="btn btn-ghost !py-1.5 !px-2.5 text-sm ${c.pinned ? '!border-accent/40' : ''}" style="${c.pinned ? `color:${h}` : ''}">${ICON.pin} <span>${c.pinned ? 'Pinned' : 'Pin'}</span></button>
-      <button id="m-fav" class="btn btn-ghost !py-1.5 !px-2.5 text-sm" style="${c.favorite ? 'color:#f5c518' : ''}">${ICON.star} <span>${c.favorite ? 'Starred' : 'Star'}</span></button>
+      <button id="m-fav" class="btn btn-ghost !py-1.5 !px-2.5 text-sm" style="${c.favorite ? 'color:#fbbf24' : ''}">${c.favorite ? ICON.starFill : ICON.star} <span>${c.favorite ? 'Starred' : 'Star'}</span></button>
       <button id="m-delete" class="btn btn-ghost !py-1.5 !px-2.5 text-sm ml-auto hover:!text-rose-300">${ICON.trash} <span>Delete</span></button>
     </div>
 
     <!-- body: editor + preview -->
     <div class="flex-1 grid grid-rows-2 lg:grid-rows-1 lg:grid-cols-2 min-h-0">
-      <div class="flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r border-white/5">
-        <span class="label-sm px-5 pt-3 pb-1">Write — commands, notes, links…</span>
+      <div class="flex flex-col min-h-0 p-4 sm:p-5 lg:pr-2.5">
+        <span class="label-sm mb-2">Write — commands, notes, links…</span>
         <textarea id="m-content" spellcheck="false"
-          class="flex-1 resize-none bg-transparent outline-none px-5 pb-5 pt-1 text-lg leading-relaxed"
+          class="flex-1 resize-none outline-none rounded-xl bg-black/30 border border-white/10 p-4 text-lg leading-relaxed break-words"
           placeholder="Type anything here. Paste a command or code snippet and toggle Code for syntax colours. URLs become clickable in the preview →">${esc(c.content)}</textarea>
       </div>
-      <div class="flex flex-col min-h-0">
-        <span class="label-sm px-5 pt-3 pb-1">Preview</span>
-        <div id="m-preview" class="flex-1 overflow-auto px-5 pb-5 pt-1 text-lg">${renderContent(c, { full: true })}</div>
+      <div class="flex flex-col min-h-0 p-4 sm:p-5 lg:pl-2.5">
+        <span class="label-sm mb-2">Preview</span>
+        <div id="m-preview" class="flex-1 overflow-auto rounded-xl bg-black/20 border border-white/10 p-4 text-lg break-words">${renderContent(c, { full: true })}</div>
       </div>
     </div>
-    <div class="px-5 py-1.5 text-xs text-mist-400 border-t border-white/5">Changes save automatically.</div>
+    <div class="px-5 py-2 text-xs text-mist-400 border-t border-white/5">Changes save automatically.</div>
   </div>`;
 }
 
@@ -635,6 +710,7 @@ function wireModal() {
       panel.style.borderColor = `${h}55`;
       (panel.querySelector('div') as HTMLElement).style.background = `linear-gradient(90deg, ${h}, ${h}55)`;
       (panel.querySelector('header span') as HTMLElement).style.background = h;
+      (document.getElementById('m-title') as HTMLInputElement).style.borderColor = `${h}99`;
       await patchCard(c.id, { color: c.color });
     })
   );
@@ -890,8 +966,26 @@ function wireGlobal() {
     }
 
     const tile = t.closest('.card-tile') as HTMLElement | null;
-    if (tile) openModal(tile.dataset.card!);
+    if (tile) {
+      // single click selects; double click (handled below) opens
+      if (cardClickTimer) return; // second click of a double — let dblclick handle it
+      const id = tile.dataset.card!;
+      cardClickTimer = window.setTimeout(() => { cardClickTimer = undefined; selectCard(id); }, 230);
+      return;
+    }
+    clearSelection(); // clicked empty space in the grid
   });
+
+  // double-click a card to open it full-screen
+  $('card-grid').addEventListener('dblclick', (e) => {
+    const tile = (e.target as HTMLElement).closest('.card-tile') as HTMLElement | null;
+    if (!tile) return;
+    if (cardClickTimer) { clearTimeout(cardClickTimer); cardClickTimer = undefined; }
+    openModal(tile.dataset.card!);
+  });
+
+  // delete the selected card(s)
+  $('delete-card-btn').addEventListener('click', deleteSelectedCards);
 
   // close popovers on outside click
   document.addEventListener('click', (e) => {
@@ -912,6 +1006,7 @@ function wireGlobal() {
       if (document.querySelector('.popover')) { closePopovers(); return; }
       if (modalCardId) { closeModal(); return; }
       if (sidebarOpen()) { closeSidebar(); return; }
+      if (selectedCardIds.size) { clearSelection(); return; }
     }
     // search navigation
     if (!$('search-overlay').classList.contains('hidden')) {

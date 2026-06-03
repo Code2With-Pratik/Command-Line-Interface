@@ -7,22 +7,40 @@ export const prerender = false;
 // Already logged in? Go straight to the workspace.
 const user = await getUser(Astro.cookies);
 if (user) return Astro.redirect('/app');
+
+// ASCII banner shown in the intro splash ("COMMAND LINE INTERFACE").
+const introArt = `░░░░░░  ░░░░░░  ░░░    ░░░ ░░░    ░░░  ░░░░░  ░░░    ░░ ░░░░░░      ░░      ░░ ░░░    ░░ ░░░░░░░     ░░ ░░░    ░░ ░░░░░░░░ ░░░░░░░ ░░░░░░  ░░░░░░░  ░░░░░   ░░░░░░ ░░░░░░░
+▒▒      ▒▒    ▒▒ ▒▒▒▒  ▒▒▒▒ ▒▒▒▒  ▒▒▒▒ ▒▒   ▒▒ ▒▒▒▒   ▒▒ ▒▒   ▒▒     ▒▒      ▒▒ ▒▒▒▒   ▒▒ ▒▒          ▒▒ ▒▒▒▒   ▒▒    ▒▒    ▒▒      ▒▒   ▒▒ ▒▒      ▒▒   ▒▒ ▒▒      ▒▒
+▒▒      ▒▒    ▒▒ ▒▒ ▒▒▒▒ ▒▒ ▒▒ ▒▒▒▒ ▒▒ ▒▒▒▒▒▒▒ ▒▒ ▒▒  ▒▒ ▒▒   ▒▒     ▒▒      ▒▒ ▒▒ ▒▒  ▒▒ ▒▒▒▒▒       ▒▒ ▒▒ ▒▒  ▒▒    ▒▒    ▒▒▒▒▒   ▒▒▒▒▒▒  ▒▒▒▒▒   ▒▒▒▒▒▒▒ ▒▒      ▒▒▒▒▒
+▓▓      ▓▓    ▓▓ ▓▓  ▓▓  ▓▓ ▓▓  ▓▓  ▓▓ ▓▓   ▓▓ ▓▓  ▓▓ ▓▓ ▓▓   ▓▓     ▓▓      ▓▓ ▓▓  ▓▓ ▓▓ ▓▓          ▓▓ ▓▓  ▓▓ ▓▓    ▓▓    ▓▓      ▓▓   ▓▓ ▓▓      ▓▓   ▓▓ ▓▓      ▓▓
+ ██████  ██████  ██      ██ ██      ██ ██   ██ ██   ████ ██████      ███████ ██ ██   ████ ███████     ██ ██   ████    ██    ███████ ██   ██ ██      ██   ██  ██████ ███████`;
 ---
 
 <Base title="CLIDesk — Sign in">
+  <!-- intro splash: logo centres, then glides left as the title slides out of it -->
+  <div id="intro" class="fixed inset-0 z-[200] grid place-items-center overflow-hidden">
+    <div class="flex items-center gap-3 sm:gap-5 px-4 max-w-[98vw]">
+      <div class="intro-logo w-16 h-16 sm:w-20 sm:h-20 rounded-3xl grid place-items-center shrink-0"
+           style="background:linear-gradient(135deg,#fde047,#f97316);box-shadow:0 16px 50px -10px rgba(249,115,22,.65)">
+        <span class="font-heading text-3xl sm:text-4xl font-bold" style="color:#1a1205">&gt;_</span>
+      </div>
+      <pre class="intro-text grad-text font-mono whitespace-pre leading-[1.05] m-0 select-none shrink-0" style="font-size:clamp(2.2px,0.78vw,10px)">{introArt}</pre>
+    </div>
+  </div>
+
   <main class="min-h-screen w-full flex items-center justify-center px-5 py-10">
     <div class="w-full max-w-5xl grid md:grid-cols-2 gap-10 items-center">
       <!-- Brand / pitch -->
       <section class="hidden md:block animate-rise">
         <div class="flex items-center gap-3 mb-6">
           <div class="w-12 h-12 rounded-2xl grid place-items-center"
-               style="background:linear-gradient(180deg,#a48bff,#7c5cff);box-shadow:0 10px 30px -8px rgba(124,92,255,.7)">
-            <span class="font-heading text-2xl text-[#0c0a18] font-bold">&gt;_</span>
+               style="background:linear-gradient(135deg,#fde047,#f97316);box-shadow:0 10px 30px -8px rgba(249,115,22,.6)">
+            <span class="font-heading text-2xl font-bold" style="color:#1a1205">&gt;_</span>
           </div>
-          <span class="font-heading text-3xl">CLIDesk</span>
+          <span class="font-heading text-3xl grad-text">CLIDesk</span>
         </div>
-        <h1 class="font-heading text-4xl leading-tight mb-4">
-          Your personal vault for <span style="color:var(--color-accent-soft)">commands</span>,
+        <h1 class="font-heading text-4xl leading-tight mb-4 grad-text">
+          Your personal vault for commands,
           shortcuts, snippets, tools &amp; links.
         </h1>
         <p class="text-xl text-mist-300 leading-relaxed">
@@ -43,10 +61,10 @@ if (user) return Astro.redirect('/app');
       <section class="glass rounded-3xl p-7 sm:p-9 animate-pop shadow-2xl">
         <div class="md:hidden flex items-center gap-3 mb-6 justify-center">
           <div class="w-10 h-10 rounded-xl grid place-items-center"
-               style="background:linear-gradient(180deg,#a48bff,#7c5cff)">
-            <span class="font-heading text-xl text-[#0c0a18] font-bold">&gt;_</span>
+               style="background:linear-gradient(135deg,#fde047,#f97316)">
+            <span class="font-heading text-xl font-bold" style="color:#1a1205">&gt;_</span>
           </div>
-          <span class="font-heading text-2xl">CLIDesk</span>
+          <span class="font-heading text-2xl grad-text">CLIDesk</span>
         </div>
 
         <!-- tab switch -->
@@ -192,5 +210,8 @@ if (user) return Astro.redirect('/app');
     });
 
     render();
+
+    // remove the intro splash once it has finished (keeps the login interactive)
+    setTimeout(() => document.getElementById('intro')?.remove(), 2750);
   </script>
 </Base>
