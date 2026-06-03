@@ -768,13 +768,21 @@ function wireModal() {
     patchCard(c.id, { language: c.language });
   });
 
+  // Update pin/favourite in place (rebuilding the modal would flash the backdrop blur).
   $('m-pin').addEventListener('click', async () => {
-    await patchCard(c.id, { pinned: !c.pinned });
-    reopenModalPreserve();
+    c.pinned = !c.pinned;
+    const btn = $('m-pin');
+    btn.innerHTML = `${ICON.pin} <span>${c.pinned ? 'Pinned' : 'Pin'}</span>`;
+    btn.style.color = c.pinned ? hex(c.color) : '';
+    btn.classList.toggle('!border-accent/40', c.pinned);
+    await patchCard(c.id, { pinned: c.pinned });
   });
   $('m-fav').addEventListener('click', async () => {
-    await patchCard(c.id, { favorite: !c.favorite });
-    reopenModalPreserve();
+    c.favorite = !c.favorite;
+    const btn = $('m-fav');
+    btn.innerHTML = `${c.favorite ? ICON.starFill : ICON.star} <span>${c.favorite ? 'Starred' : 'Star'}</span>`;
+    btn.style.color = c.favorite ? '#fbbf24' : '';
+    await patchCard(c.id, { favorite: c.favorite });
   });
   $('m-delete').addEventListener('click', () => deleteCard(c.id));
 
