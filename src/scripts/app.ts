@@ -855,13 +855,17 @@ function reopenModalPreserve() {
 function openDownloadMenu(c: Card) {
   closePopovers();
   const anchor = $('m-download');
+  const imgIcon = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-4.5-4.5L5 21"/></svg>';
+  const pdfIcon = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
   const pop = document.createElement('div');
-  pop.className = 'popover glass rounded-xl p-1.5 shadow-2xl animate-pop';
+  pop.className = 'popover glass rounded-2xl p-2 shadow-2xl animate-pop';
   pop.style.position = 'fixed';
   pop.style.zIndex = '90';
   pop.innerHTML = `
-    <button class="dl-png btn btn-ghost w-full justify-start text-sm !py-2">🖼  Download as PNG image</button>
-    <button class="dl-pdf btn btn-ghost w-full justify-start text-sm !py-2 mt-1">📄  Download as PDF</button>`;
+    <div class="grid grid-cols-2 gap-1.5">
+      <button class="dl-png flex flex-col items-center justify-center gap-1.5 w-[4.5rem] h-[4.5rem] rounded-xl bg-white/5 hover:bg-white/15 text-mist-200 text-xs transition" title="Download as PNG image">${imgIcon}<span>PNG</span></button>
+      <button class="dl-pdf flex flex-col items-center justify-center gap-1.5 w-[4.5rem] h-[4.5rem] rounded-xl bg-white/5 hover:bg-white/15 text-mist-200 text-xs transition" title="Download as PDF">${pdfIcon}<span>PDF</span></button>
+    </div>`;
   document.body.appendChild(pop);
   const r = anchor.getBoundingClientRect();
   pop.style.top = `${r.bottom + 6}px`;
