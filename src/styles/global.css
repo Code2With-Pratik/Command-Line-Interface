@@ -87,6 +87,13 @@ input, textarea, select, button, kbd {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--card-accent, var(--color-accent)) 22%, transparent);
 }
 
+/* spotlight search input: no focus ring (looks cleaner) */
+#s-input:focus,
+#s-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 /* ----------------------------------------------------------------------------
    Reusable component classes
 ---------------------------------------------------------------------------- */
@@ -261,9 +268,9 @@ input, textarea, select, button, kbd {
 }
 
 /* ----------------------------------------------------------------------------
-   Mobile — sidebar becomes an off-canvas overlay (< 768px)
+   Mobile & tablet — sidebar becomes an off-canvas overlay (< 1024px)
 ---------------------------------------------------------------------------- */
-@media (max-width: 767px) {
+@media (max-width: 1023px) {
   #sidebar {
     position: fixed;
     top: 0;

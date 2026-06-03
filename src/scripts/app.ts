@@ -43,6 +43,13 @@ const state = {
 const selectedCardIds = new Set<string>();
 let cardClickTimer: number | undefined;
 
+// touch devices: tap opens, long-press selects, tap-while-selecting toggles
+const isTouch = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
+let lpTimer: number | undefined;
+let lpFired = false;
+let lpX = 0;
+let lpY = 0;
+
 /* ============================ dom helpers ========================== */
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const esc = (s: string) =>
@@ -342,7 +349,7 @@ style.textContent = `
 .mini-btn{display:inline-flex;align-items:center;justify-content:center;width:1.85rem;height:1.85rem;border-radius:.55rem;color:#c8c8d2;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(6px);transition:background .15s,color .15s,transform .1s}
 .mini-btn:hover{background:rgba(0,0,0,.7);color:#fff}
 .mini-btn:active{transform:scale(.9)}
-.card-tile{transition:transform .16s ease, box-shadow .16s ease, outline-color .16s ease}
+.card-tile{transition:transform .16s ease, box-shadow .16s ease, outline-color .16s ease;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .card-tile:hover{transform:translateY(-3px)}
 .card-tile.is-selected{outline:2.5px solid #fff;outline-offset:3px}
 .card-tile.is-selected::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.05);pointer-events:none}
@@ -989,6 +996,7 @@ function wireGlobal() {
   // mobile sidebar overlay
   $('sidebar-toggle').addEventListener('click', () => (sidebarOpen() ? closeSidebar() : openSidebar()));
   $('sidebar-backdrop').addEventListener('click', closeSidebar);
+  document.getElementById('sidebar-close')?.addEventListener('click', closeSidebar);
 
   // tab list delegation
   $('tab-list').addEventListener('click', (e) => {
@@ -1026,22 +1034,60 @@ function wireGlobal() {
 
     const tile = t.closest('.card-tile') as HTMLElement | null;
     if (tile) {
-      // single click selects; double click (handled below) opens
-      if (cardClickTimer) return; // second click of a double — let dblclick handle it
       const id = tile.dataset.card!;
+      if (isTouch) {
+        if (lpFired) { lpFired = false; return; }    // long-press already selected this card
+        if (selectedCardIds.size > 0) selectCard(id); // in selection mode: tap toggles
+        else openModal(id);                           // normal tap: open
+        return;
+      }
+      // mouse: single click selects, double click opens
+      if (cardClickTimer) return; // second click of a double — let dblclick handle it
       cardClickTimer = window.setTimeout(() => { cardClickTimer = undefined; selectCard(id); }, 230);
       return;
     }
     clearSelection(); // clicked empty space in the grid
   });
 
-  // double-click a card to open it full-screen
+  // double-click a card to open it full-screen (mouse only)
   $('card-grid').addEventListener('dblclick', (e) => {
+    if (isTouch) return;
     const tile = (e.target as HTMLElement).closest('.card-tile') as HTMLElement | null;
     if (!tile) return;
     if (cardClickTimer) { clearTimeout(cardClickTimer); cardClickTimer = undefined; }
     openModal(tile.dataset.card!);
   });
+
+  // touch: long-press a card to select (enters selection mode)
+  if (isTouch) {
+    const grid = $('card-grid');
+    grid.addEventListener('pointerdown', (e) => {
+      const t = e.target as HTMLElement;
+      if (t.closest('.act-pin, .act-fav, .act-color, .act-edit, [data-add-card]')) return;
+      const tile = t.closest('.card-tile') as HTMLElement | null;
+      if (!tile) return;
+      lpFired = false;
+      lpX = e.clientX;
+      lpY = e.clientY;
+      const id = tile.dataset.card!;
+      clearTimeout(lpTimer);
+      lpTimer = window.setTimeout(() => {
+        lpFired = true;
+        selectCard(id);
+        try { (navigator as any).vibrate?.(15); } catch {}
+      }, 500);
+    });
+    grid.addEventListener('pointermove', (e) => {
+      if (lpTimer !== undefined && (Math.abs(e.clientX - lpX) > 10 || Math.abs(e.clientY - lpY) > 10)) {
+        clearTimeout(lpTimer);
+        lpTimer = undefined;
+      }
+    });
+    const cancelLp = () => { clearTimeout(lpTimer); lpTimer = undefined; };
+    grid.addEventListener('pointerup', cancelLp);
+    grid.addEventListener('pointercancel', cancelLp);
+    grid.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
 
   // delete the selected card(s)
   $('delete-card-btn').addEventListener('click', deleteSelectedCards);
