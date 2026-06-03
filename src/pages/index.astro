@@ -19,12 +19,12 @@ const introArt = `░░░░░░  ░░░░░░  ░░░    ░░░
 <Base title="CLIDesk — Sign in">
   <!-- intro splash: logo centres, then glides left as the title slides out of it -->
   <div id="intro" class="fixed inset-0 z-[200] grid place-items-center overflow-hidden">
-    <div class="flex items-center gap-3 sm:gap-5 px-4 max-w-[98vw]">
+    <div class="flex flex-col sm:flex-row items-center gap-6 sm:gap-10 px-3 max-w-[98vw]">
       <div class="intro-logo w-16 h-16 sm:w-20 sm:h-20 rounded-3xl grid place-items-center shrink-0"
            style="background:linear-gradient(135deg,#fde047,#f97316);box-shadow:0 16px 50px -10px rgba(249,115,22,.65)">
         <span class="font-heading text-3xl sm:text-4xl font-bold" style="color:#1a1205">&gt;_</span>
       </div>
-      <pre class="intro-text grad-text font-mono whitespace-pre leading-[1.05] m-0 select-none shrink-0" style="font-size:clamp(2.2px,0.78vw,10px)">{introArt}</pre>
+      <pre class="intro-text grad-text font-mono whitespace-pre leading-[1.05] m-0 select-none shrink-0" style="font-size:clamp(1.9px,0.72vw,10px)">{introArt}</pre>
     </div>
   </div>
 
@@ -74,7 +74,7 @@ const introArt = `░░░░░░  ░░░░░░  ░░░    ░░░
         </div>
 
         <form id="auth-form" class="space-y-4" novalidate>
-          <div id="name-wrap" class="space-y-1 hidden">
+          <div id="name-wrap" class="space-y-1 overflow-hidden transition-all duration-300 ease-out" style="max-height:0;opacity:0">
             <label class="label-sm" for="username">Name</label>
             <input class="field" id="username" name="username" type="text" autocomplete="name" placeholder="Ada Lovelace" />
           </div>
@@ -83,8 +83,16 @@ const introArt = `░░░░░░  ░░░░░░  ░░░    ░░░
             <input class="field" id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
           </div>
           <div class="space-y-1">
-            <label class="label-sm" for="password">Password</label>
-            <input class="field" id="password" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
+            <div class="flex items-center justify-between gap-2">
+              <label class="label-sm" for="password">Password</label>
+              <button type="button" id="forgot-btn" class="text-sm text-accent-soft hover:underline">Forgot password?</button>
+            </div>
+            <div class="relative">
+              <input class="field pr-11" id="password" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
+              <button type="button" id="toggle-pass" class="absolute right-2 top-1/2 -translate-y-1/2 grid place-items-center w-8 h-8 rounded-lg text-mist-400 hover:text-mist-100" aria-label="Show password">
+                <span id="eye-icon"></span>
+              </button>
+            </div>
           </div>
 
           <button id="auth-submit" type="submit" class="btn btn-primary w-full text-lg mt-1">
@@ -98,7 +106,25 @@ const introArt = `░░░░░░  ░░░░░░  ░░░    ░░░
   </main>
 
   <!-- toast notifications -->
-  <div id="toast-stack" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] flex flex-col items-center gap-2 w-[min(420px,92vw)]"></div>
+  <div id="toast-stack" class="fixed top-6 left-1/2 -translate-x-1/2 z-[70] flex flex-col items-center gap-2 w-[min(420px,92vw)]"></div>
+
+  <!-- reset password overlay -->
+  <div id="reset-overlay" class="fixed inset-0 z-[120] hidden items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade" data-reset-close></div>
+    <div class="relative w-[min(360px,92vw)] glass rounded-3xl p-7 shadow-2xl animate-pop">
+      <h3 class="font-heading text-2xl mb-1">Reset password</h3>
+      <p class="text-mist-300 text-sm mb-4 leading-relaxed">Enter your email and a new password.</p>
+      <form id="reset-form" class="space-y-3" novalidate>
+        <input class="field" id="reset-email" type="email" autocomplete="email" placeholder="you@example.com" />
+        <input class="field" id="reset-pass" type="password" autocomplete="new-password" placeholder="New password" />
+        <input class="field" id="reset-pass2" type="password" autocomplete="new-password" placeholder="Confirm new password" />
+        <div class="grid grid-cols-2 gap-2.5 pt-1">
+          <button type="button" class="btn btn-ghost w-full justify-center" data-reset-close>Cancel</button>
+          <button type="submit" id="reset-submit" class="btn btn-primary w-full justify-center">Reset</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <script>
     type Mode = 'login' | 'signup';
@@ -136,7 +162,8 @@ const introArt = `░░░░░░  ░░░░░░  ░░░    ░░░
 
     function render() {
       const isSignup = mode === 'signup';
-      nameWrap.classList.toggle('hidden', !isSignup);
+      nameWrap.style.maxHeight = isSignup ? '6rem' : '0';
+      nameWrap.style.opacity = isSignup ? '1' : '0';
       submitLabel.textContent = isSignup ? 'Create account' : 'Log in';
       switchHint.innerHTML = isSignup
         ? 'Already have an account? <button id="goto-login" class="text-accent-soft underline">Log in</button>'
@@ -149,6 +176,7 @@ const introArt = `░░░░░░  ░░░░░░  ░░░    ░░░
 
       (document.getElementById('password') as HTMLInputElement).autocomplete =
         isSignup ? 'new-password' : 'current-password';
+      ($('forgot-btn') as HTMLElement).style.display = isSignup ? 'none' : '';
 
       document.getElementById('goto-login')?.addEventListener('click', () => setMode('login'));
       document.getElementById('goto-signup')?.addEventListener('click', () => setMode('signup'));
@@ -206,6 +234,71 @@ const introArt = `░░░░░░  ░░░░░░  ░░░    ░░░
       } catch {
         toast('Network error — is the server running?');
         setBusy(false);
+      }
+    });
+
+    // ---- show/hide password ---------------------------------------------------
+    const EYE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+    const EYE_OFF = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.5 0 10 7 10 7a13.3 13.3 0 0 1-2.16 2.92"/><path d="M6.6 6.6A13.3 13.3 0 0 0 2 12s3.5 7 10 7a9 9 0 0 0 4-.92"/><path d="m2 2 20 20"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+    const passInput = $('password') as HTMLInputElement;
+    const eyeIcon = $('eye-icon');
+    eyeIcon.innerHTML = EYE;
+    $('toggle-pass').addEventListener('click', () => {
+      const show = passInput.type === 'password';
+      passInput.type = show ? 'text' : 'password';
+      eyeIcon.innerHTML = show ? EYE_OFF : EYE;
+    });
+
+    // ---- forgot / reset password ----------------------------------------------
+    const resetOverlay = $('reset-overlay');
+    const resetForm = $('reset-form') as HTMLFormElement;
+    const resetSubmit = $('reset-submit') as HTMLButtonElement;
+    function openReset() {
+      ($('reset-email') as HTMLInputElement).value = (document.getElementById('email') as HTMLInputElement).value.trim();
+      resetOverlay.classList.remove('hidden');
+      resetOverlay.classList.add('flex');
+      setTimeout(() => ($('reset-email') as HTMLInputElement).focus(), 30);
+    }
+    function closeReset() {
+      resetOverlay.classList.add('hidden');
+      resetOverlay.classList.remove('flex');
+      resetForm.reset();
+    }
+    $('forgot-btn').addEventListener('click', openReset);
+    resetOverlay.querySelectorAll('[data-reset-close]').forEach((el) => el.addEventListener('click', closeReset));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !resetOverlay.classList.contains('hidden')) closeReset(); });
+
+    resetForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = ($('reset-email') as HTMLInputElement).value.trim();
+      const p1 = ($('reset-pass') as HTMLInputElement).value;
+      const p2 = ($('reset-pass2') as HTMLInputElement).value;
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast('Please enter a valid email address.');
+      if (p1.length < 6) return toast('Password must be at least 6 characters.');
+      if (p1 !== p2) return toast('Passwords do not match.');
+
+      resetSubmit.disabled = true;
+      resetSubmit.textContent = 'Resetting…';
+      try {
+        const res = await fetch('/api/auth/reset', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ email, password: p1 }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          toast(body.error || 'Could not reset password.');
+        } else {
+          toast('Password updated — you can log in now.', 'ok');
+          (document.getElementById('email') as HTMLInputElement).value = email;
+          closeReset();
+          setMode('login');
+        }
+      } catch {
+        toast('Network error — is the server running?');
+      } finally {
+        resetSubmit.disabled = false;
+        resetSubmit.textContent = 'Reset';
       }
     });
 

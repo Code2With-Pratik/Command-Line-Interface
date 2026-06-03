@@ -119,13 +119,13 @@ function openDialog(o: DialogOpts): Promise<string | boolean | null> {
     } else {
       root.innerHTML = `
         <div class="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade" data-cancel></div>
-        <div class="dialog-panel relative w-[min(420px,94vw)] glass rounded-2xl p-6 shadow-2xl animate-pop">
-          <h3 class="font-heading text-2xl mb-1">${esc(o.title)}</h3>
-          ${o.message ? `<p class="text-mist-300 text-base mb-4 leading-relaxed">${esc(o.message)}</p>` : '<div class="mb-3"></div>'}
-          ${o.label ? `<label class="label-sm block mb-1.5">${esc(o.label)}</label>` : ''}<input id="dlg-input" class="field mb-5" autocomplete="off" />
-          <div class="flex justify-end gap-2">
-            <button class="btn btn-ghost" data-cancel>Cancel</button>
-            <button class="btn btn-primary" data-ok>${esc(o.confirmText || 'OK')}</button>
+        <div class="dialog-panel relative w-[min(340px,92vw)] glass rounded-3xl p-7 shadow-2xl animate-pop">
+          <h3 class="font-heading text-2xl mb-1.5">${esc(o.title)}</h3>
+          ${o.message ? `<p class="text-mist-300 text-base mb-4 leading-relaxed">${esc(o.message)}</p>` : ''}
+          ${o.label ? `<label class="label-sm block mb-1.5">${esc(o.label)}</label>` : ''}<input id="dlg-input" class="field mb-6" autocomplete="off" />
+          <div class="grid grid-cols-2 gap-2.5">
+            <button class="btn btn-ghost w-full justify-center" data-cancel>Cancel</button>
+            <button class="btn btn-primary w-full justify-center" data-ok>${esc(o.confirmText || 'OK')}</button>
           </div>
         </div>`;
     }
@@ -673,13 +673,13 @@ function modalHtml(c: Card): string {
     <div class="flex flex-wrap items-center gap-2 px-5 py-2.5 border-b border-white/5 text-sm">
       <div class="flex items-center gap-1.5">${colorSwatches(c.color)}</div>
       <span class="w-px h-6 bg-white/10 mx-1"></span>
-      <button id="m-code" title="Toggle between code and plain text" class="btn btn-ghost !py-1.5 !px-2.5 text-sm"><span id="m-code-icon">${c.isCode ? ICON.text : ICON.code}</span> <span id="m-code-label">${c.isCode ? 'Text' : 'Code'}</span></button>
+      <button id="m-code" title="Toggle between code and plain text" class="btn btn-ghost !py-1.5 !px-2.5 text-sm min-w-[6rem]"><span id="m-code-icon">${c.isCode ? ICON.text : ICON.code}</span> <span id="m-code-label">${c.isCode ? 'Text' : 'Code'}</span></button>
       <select id="m-font" class="field !w-auto !py-1.5 !px-2 text-sm" title="Card font">
         ${FONTS.map((f) => `<option value="${esc(f)}" ${f === fontOf(c) ? 'selected' : ''} style="font-family:'${f}'">${esc(f)}</option>`).join('')}
       </select>
       <span class="w-px h-6 bg-white/10 mx-1"></span>
-      <button id="m-pin" class="btn btn-ghost !py-1.5 !px-2.5 text-sm ${c.pinned ? '!border-accent/40' : ''}" style="${c.pinned ? `color:${h}` : ''}">${ICON.pin} <span>${c.pinned ? 'Pinned' : 'Pin'}</span></button>
-      <button id="m-fav" class="btn btn-ghost !py-1.5 !px-2.5 text-sm" style="${c.favorite ? 'color:#fbbf24' : ''}">${c.favorite ? ICON.starFill : ICON.star} <span>${c.favorite ? 'Starred' : 'Star'}</span></button>
+      <button id="m-pin" class="btn btn-ghost !py-1.5 !px-2.5 text-sm min-w-[6.5rem] ${c.pinned ? '!border-accent/40' : ''}" style="${c.pinned ? `color:${h}` : ''}">${ICON.pin} <span>${c.pinned ? 'Pinned' : 'Pin'}</span></button>
+      <button id="m-fav" class="btn btn-ghost !py-1.5 !px-2.5 text-sm min-w-[6.75rem]" style="${c.favorite ? 'color:#fbbf24' : ''}">${c.favorite ? ICON.starFill : ICON.star} <span>${c.favorite ? 'Starred' : 'Star'}</span></button>
       <button id="m-delete" class="btn !py-1.5 !px-2.5 text-sm ml-auto text-rose-400 border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20">${ICON.trash} <span>Delete</span></button>
     </div>
 

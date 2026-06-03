@@ -53,6 +53,17 @@ h1, h2, h3, h4, .font-heading {
 input, textarea, select, button, kbd {
   font-family: var(--font-body);
 }
+
+/* every button/link is clickable */
+button:not(:disabled),
+select,
+[role="button"],
+a {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
 .code-block, .code-block * {
   font-family: "SFMono-Regular", ui-monospace, "JetBrains Mono", Consolas, monospace !important;
 }
@@ -73,13 +84,18 @@ input, textarea, select, button, kbd {
   border-radius: 6px;
 }
 
+/* form fields: no focus ring anywhere — just a border (gray idle, accent active) */
+input:focus, input:focus-visible,
+textarea:focus, textarea:focus-visible,
+select:focus, select:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 /* inside the card popup, focus uses the card's own colour (set per-card) */
 #card-modal #m-title:focus,
 #card-modal #m-content:focus {
-  outline: 2px solid var(--card-accent, var(--color-accent));
-  outline-offset: 2px;
-}
-#card-modal #m-title:focus {
+  outline: none;
   border-color: var(--card-accent, var(--color-accent));
 }
 #card-modal .field:focus {
@@ -92,6 +108,14 @@ input, textarea, select, button, kbd {
 #s-input:focus-visible {
   outline: none;
   box-shadow: none;
+}
+
+/* font selector: no highlight ring */
+#card-modal #m-font:focus,
+#card-modal #m-font:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border-color: rgba(255, 255, 255, 0.09);
 }
 
 /* ----------------------------------------------------------------------------
@@ -174,7 +198,6 @@ input, textarea, select, button, kbd {
   .field:focus {
     outline: none;
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.18);
   }
 
   /* yellow→orange gradient text for headings */
