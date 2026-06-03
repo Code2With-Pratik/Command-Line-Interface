@@ -4,9 +4,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "astro dev",
+    "dev": "prisma generate && astro dev",
     "start": "node --env-file-if-exists=.env ./dist/server/entry.mjs",
     "build": "prisma generate && astro build",
+    "vercel-build": "prisma generate && astro build",
     "preview": "astro preview",
     "astro": "astro",
     "db:generate": "prisma generate",

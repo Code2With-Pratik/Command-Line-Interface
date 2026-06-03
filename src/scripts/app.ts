@@ -633,6 +633,7 @@ function openFontMenu(cardId: string, anchor: HTMLElement) {
 /* ============================= MODAL =============================== */
 let modalCardId: string | null = null;
 let saveTimer: number | undefined;
+let typeTimer: number | undefined;
 let modalView: 'write' | 'preview' = 'write';
 
 function setModalView(mode: 'write' | 'preview') {
@@ -675,6 +676,7 @@ function openModal(cardId: string) {
 }
 
 function closeModal() {
+  if (typeTimer) { clearInterval(typeTimer); typeTimer = undefined; }
   if (saveTimer) { clearTimeout(saveTimer); flushSave(); }
   const root = $('card-modal');
   const panel = root.querySelector('.modal-panel');
@@ -754,13 +756,52 @@ function updatePreview() {
   $('m-preview').innerHTML = renderContent(c, { full: true });
 }
 
-// replay a quick swap animation on the preview (used when toggling code/text)
+// replay a quick swap animation on the preview (used when switching to preview tab)
 function animatePreview() {
   const pv = document.getElementById('m-preview');
   if (!pv) return;
   pv.classList.remove('preview-swap');
   void pv.offsetWidth; // force reflow so the animation restarts
   pv.classList.add('preview-swap');
+}
+
+// fast typewriter reveal of the preview (used when toggling code/text)
+function typewritePreview() {
+  const pv = document.getElementById('m-preview');
+  const c = currentModalCard();
+  if (!pv || !c) return;
+  const html = renderContent(c, { full: true });
+
+  // safe slice points: after each complete tag / entity / character
+  const cuts: number[] = [];
+  let i = 0;
+  while (i < html.length) {
+    if (html[i] === '<') {
+      const end = html.indexOf('>', i);
+      i = end === -1 ? html.length : end + 1;
+    } else if (html[i] === '&') {
+      const end = html.indexOf(';', i);
+      i = end !== -1 && end - i <= 8 ? end + 1 : i + 1;
+    } else {
+      i += 1;
+    }
+    cuts.push(i);
+  }
+
+  if (typeTimer) clearInterval(typeTimer);
+  const step = Math.max(2, Math.ceil(cuts.length / 55)); // ~55 ticks total → fast
+  let k = 0;
+  pv.innerHTML = '';
+  typeTimer = window.setInterval(() => {
+    k += step;
+    if (k >= cuts.length) {
+      pv.innerHTML = html;
+      clearInterval(typeTimer);
+      typeTimer = undefined;
+      return;
+    }
+    pv.innerHTML = html.slice(0, cuts[k]);
+  }, 12);
 }
 
 function refreshModalChrome() {
@@ -841,8 +882,8 @@ function wireModal() {
     c.isCode = !c.isCode;
     if (c.isCode && c.language === 'plaintext') c.language = detectLanguage(c.content) || 'plaintext';
     syncCodeUi();
-    updatePreview();
-    if (modalView === 'preview') animatePreview();
+    if (modalView === 'preview') typewritePreview();
+    else updatePreview();
     patchCard(c.id, { isCode: c.isCode, language: c.language });
   });
   // font selector — iOS-style dropdown (applies to the card's text; code stays monospace)
