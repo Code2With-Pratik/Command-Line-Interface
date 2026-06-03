@@ -39,6 +39,13 @@ Built with **Astro 5 (SSR) · Tailwind CSS v4 · Prisma 7 (pg driver adapter) ·
 ### Search
 - **`Ctrl/⌘ + K`** opens a Spotlight‑style search across tab names, card names, content and code. Arrow keys to move, **Enter** to open.
 
+### AI assistant (voice)
+- A **draggable, bouncing mascot** (gradient orb with a top hat, glasses, blinking eyes and happy/sad/angry/mad faces).
+- **Click** it to play a sound and start **listening** (Web Speech API); **type** in the conversation bar as a fallback.
+- **Domain‑limited on purpose:** it only ever **searches and opens your own cards/boards** — e.g. *“open the windows shortcuts”* opens that card in the Preview tab and says *“Opening Windows Shortcuts.”* It does not answer general questions.
+- Your words and its replies appear as a **live conversation** at the bottom of the screen.
+- Optional: drop an **`ohhh.mp3`** into `public/` for the click sound (a synthesized tone is used if the file is absent).
+
 ### Look & feel
 - Dark theme, **yellow → orange gradients** on black, rotated **white dotted** backgrounds (dashboard, auth page and intro splash).
 - Animated intro splash: logo + an ASCII “COMMAND LINE INTERFACE” banner.

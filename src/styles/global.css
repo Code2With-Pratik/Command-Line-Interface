@@ -262,6 +262,47 @@ select:focus, select:focus-visible {
 .preview-swap { animation: preview-swap 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
 /* ----------------------------------------------------------------------------
+   Floating AI assistant
+---------------------------------------------------------------------------- */
+@keyframes ai-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+@keyframes ai-pulse { 0% { transform: scale(0.85); opacity: 0.85; } 100% { transform: scale(1.35); opacity: 0; } }
+.assistant-bob { animation: ai-bob 2.6s ease-in-out infinite; }
+#assistant.dragging { cursor: grabbing; }
+#assistant.dragging .assistant-bob { animation: none; }
+#assistant.listening .assistant-bob { animation: ai-bob 0.85s ease-in-out infinite; }
+#assistant-btn { transition: transform 0.12s ease; }
+#assistant-btn:active { transform: scale(0.92); }
+#assistant.listening #assistant-btn::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 9999px;
+  border: 2px solid #fbbf24;
+  animation: ai-pulse 1s ease-out infinite;
+}
+/* facial expressions (toggled via data-face) */
+#assistant .bot-mouth, #assistant .bot-brow { display: none; }
+#assistant[data-face="happy"] .bot-mouth-happy { display: block; }
+#assistant[data-face="sad"] .bot-mouth-sad { display: block; }
+#assistant[data-face="sad"] .bot-brow-sad { display: block; }
+#assistant[data-face="angry"] .bot-mouth-angry { display: block; }
+#assistant[data-face="angry"] .bot-brow-angry { display: block; }
+#assistant[data-face="mad"] .bot-mouth-mad { display: block; }
+#assistant[data-face="mad"] .bot-brow-angry { display: block; }
+#assistant[data-face="sad"] .bot-cheek,
+#assistant[data-face="angry"] .bot-cheek,
+#assistant[data-face="mad"] .bot-cheek { opacity: 0; }
+
+/* blinking eyes */
+@keyframes bot-blink { 0%, 91%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+#assistant .bot-eyes { transform-box: fill-box; transform-origin: center; animation: bot-blink 4.2s infinite; }
+#assistant.listening .bot-eyes { animation-duration: 2.4s; }
+/* conversation log bubbles */
+.ai-line { padding: 0.4rem 0.7rem; border-radius: 0.75rem; max-width: 88%; line-height: 1.35; }
+.ai-line.you { margin-left: auto; background: rgba(124, 92, 255, 0.18); color: var(--color-mist-100); }
+.ai-line.ai { margin-right: auto; background: rgba(249, 115, 22, 0.16); color: #ffd9a8; }
+
+/* ----------------------------------------------------------------------------
    Intro splash — logo appears centred, glides left while the title slides out
    of it to the right, then the whole overlay fades away to reveal the page.
 ---------------------------------------------------------------------------- */

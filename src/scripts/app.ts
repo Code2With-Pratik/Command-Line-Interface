@@ -1246,8 +1246,182 @@ async function editCardName(id: string) {
 }
 
 /* ============================== boot =============================== */
+/* ============================ AI ASSISTANT ========================= */
+function initAssistant() {
+  const root = $('assistant');
+  const convo = $('assistant-convo');
+  const logEl = $('ai-log');
+  const statusEl = $('ai-status');
+  const dot = $('ai-status-dot');
+  const inputEl = $('ai-input') as HTMLInputElement;
+  if (!root || !convo) return;
+
+  const setFace = (f: 'happy' | 'sad' | 'angry' | 'mad') => { root.dataset.face = f; };
+  const speak = (t: string) => {
+    try { const u = new SpeechSynthesisUtterance(t); u.rate = 1.06; u.pitch = 1.05; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch {}
+  };
+  const addLine = (who: 'you' | 'ai', text: string) => {
+    const el = document.createElement('div');
+    el.className = `ai-line ${who}`;
+    el.textContent = text;
+    logEl.appendChild(el);
+    logEl.scrollTop = logEl.scrollHeight;
+  };
+  const reply = (text: string) => { statusEl.textContent = text; addLine('ai', text); speak(text); };
+
+  // play the click sound — uses /public/ohhh.mp3 if present, else a synth "ohh"
+  function synthOhh() {
+    try {
+      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      const ctx = new Ctx();
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(430, ctx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(240, ctx.currentTime + 0.28);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.38);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime + 0.4);
+    } catch {}
+  }
+  const playOhh = () => {
+    try { const a = new Audio('/ohhh.mp3'); a.volume = 0.75; a.play().catch(synthOhh); } catch { synthOhh(); }
+  };
+
+  // ---- domain-limited command handling (only searches/opens your stuff) ----
+  function findTarget(q: string): { type: 'card'; board: Board; card: Card } | { type: 'board'; board: Board } | null {
+    const words = q.split(/\s+/).filter((w) => w.length > 1);
+    let best: any = null, score = 0;
+    for (const b of state.boards) for (const c of b.cards) {
+      const title = c.title.toLowerCase();
+      const hay = `${title} ${c.content.toLowerCase()}`;
+      let s = 0;
+      if (q && title.includes(q)) s = 100;
+      else { s += words.filter((w) => title.includes(w)).length * 10; s += words.filter((w) => hay.includes(w)).length * 2; }
+      if (s > score) { score = s; best = { type: 'card', board: b, card: c }; }
+    }
+    if (score >= 4) return best;
+    for (const b of state.boards) {
+      const n = b.name.toLowerCase();
+      if (q && (n.includes(q) || words.some((w) => n.includes(w)))) return { type: 'board', board: b };
+    }
+    return null;
+  }
+
+  function handle(raw: string) {
+    const text = raw.trim();
+    if (!text) return;
+    addLine('you', text);
+    let q = text.toLowerCase()
+      .replace(/^(hey|hi|hello|ok|okay|yo|please)\b[,\s]*/g, '')
+      .replace(/^(can|could|would|will)\s+you\b\s*/g, '')
+      .replace(/^(please)\b\s*/g, '')
+      .replace(/^(search(\s+for)?|open|find|show(\s+me)?|go\s+to|pull\s+up|launch|bring\s+up|take\s+me\s+to)\b\s*/g, '')
+      .replace(/^(the|a|my|for)\b\s*/g, '')
+      .replace(/[?.!]+$/g, '')
+      .trim();
+    if (!q) { setFace('sad'); reply('What would you like me to open?'); return; }
+
+    const target = findTarget(q);
+    if (target && target.type === 'card') {
+      state.activeBoardId = target.board.id;
+      renderAll();
+      closeSidebar();
+      setTimeout(() => { openModal(target.card.id); setModalView('preview'); }, 90);
+      setFace('happy');
+      reply(`Opening ${target.card.title}.`);
+    } else if (target && target.type === 'board') {
+      state.activeBoardId = target.board.id;
+      renderAll();
+      closeSidebar();
+      setFace('happy');
+      reply(`Opening board ${target.board.name}.`);
+    } else {
+      setFace('sad');
+      reply(`I couldn't find "${q}" in your boards. I can only search and open your cards.`);
+    }
+  }
+
+  // ---- speech recognition (Web Speech API) ----
+  const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  let recog: any = null;
+  if (SR) {
+    recog = new SR();
+    recog.lang = 'en-US';
+    recog.interimResults = true;
+    recog.maxAlternatives = 1;
+    recog.onresult = (e: any) => {
+      let interim = '', final = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) final += r[0].transcript; else interim += r[0].transcript;
+      }
+      if (interim) statusEl.textContent = '“' + interim.trim() + '”';
+      if (final) { stopListening(); handle(final); }
+    };
+    recog.onend = () => { root.classList.remove('listening'); dot.className = 'w-2 h-2 rounded-full bg-emerald-400 shrink-0'; };
+    recog.onerror = () => { root.classList.remove('listening'); };
+  }
+  function startListening() {
+    if (!recog) { setFace('mad'); reply("Voice isn't supported in this browser — type your request below."); inputEl.focus(); return; }
+    try {
+      root.classList.add('listening');
+      setFace('happy');
+      statusEl.textContent = 'Listening…';
+      dot.className = 'w-2 h-2 rounded-full bg-rose-400 shrink-0 animate-pulse';
+      recog.start();
+    } catch {}
+  }
+  function stopListening() { try { recog && recog.stop(); } catch {} root.classList.remove('listening'); }
+
+  const openConvo = () => { convo.classList.remove('hidden'); };
+  function activate() { playOhh(); setFace('happy'); openConvo(); startListening(); }
+
+  $('ai-mic').addEventListener('click', startListening);
+  $('assistant-close').addEventListener('click', () => { convo.classList.add('hidden'); stopListening(); });
+  $('ai-form').addEventListener('submit', (e) => { e.preventDefault(); const v = inputEl.value; inputEl.value = ''; handle(v); });
+
+  // ---- drag (and tap = activate) ----
+  let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0;
+  root.addEventListener('pointerdown', (e) => {
+    if ((e.target as HTMLElement).closest('#assistant-convo')) return;
+    dragging = true; moved = false;
+    sx = e.clientX; sy = e.clientY;
+    const r = root.getBoundingClientRect();
+    ox = r.left; oy = r.top;
+    root.style.left = `${ox}px`; root.style.top = `${oy}px`;
+    root.style.right = 'auto'; root.style.bottom = 'auto';
+    root.classList.add('dragging');
+    try { root.setPointerCapture(e.pointerId); } catch {}
+  });
+  root.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) moved = true;
+    const w = root.offsetWidth, hgt = root.offsetHeight;
+    const nx = Math.max(6, Math.min(window.innerWidth - w - 6, ox + dx));
+    const ny = Math.max(6, Math.min(window.innerHeight - hgt - 6, oy + dy));
+    root.style.left = `${nx}px`; root.style.top = `${ny}px`;
+  });
+  root.addEventListener('pointerup', () => {
+    if (!dragging) return;
+    dragging = false;
+    root.classList.remove('dragging');
+    if (!moved) activate();
+    else { try { localStorage.setItem('clidesk:ai-pos', JSON.stringify({ left: root.style.left, top: root.style.top })); } catch {} }
+  });
+
+  // restore saved position
+  try {
+    const saved = JSON.parse(localStorage.getItem('clidesk:ai-pos') || 'null');
+    if (saved?.left && saved?.top) { root.style.left = saved.left; root.style.top = saved.top; root.style.right = 'auto'; root.style.bottom = 'auto'; }
+  } catch {}
+}
+
 async function boot() {
   wireGlobal();
+  initAssistant();
   renderUser();
   try {
     const data = await api<{ user: User; boards: Board[] }>('/api/data');

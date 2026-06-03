@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import AssistantBot from '../components/AssistantBot.astro';
 import { getUser } from '../lib/auth';
 
 export const prerender = false;
@@ -98,6 +99,37 @@ if (!user) return Astro.redirect('/');
 
   <!-- ============================== TOASTS ============================== -->
   <div id="toast-stack" class="fixed top-5 left-1/2 -translate-x-1/2 z-[70] flex flex-col items-center gap-2"></div>
+
+  <!-- =========================== AI ASSISTANT =========================== -->
+  <div id="assistant" data-face="happy" class="fixed z-[85] select-none" style="right:20px;bottom:90px;touch-action:none;cursor:grab">
+    <div class="assistant-bob">
+      <button id="assistant-btn" type="button" class="block w-[104px] h-[104px] sm:w-[116px] sm:h-[116px] relative" title="Talk to me" aria-label="AI assistant">
+        <AssistantBot />
+      </button>
+    </div>
+  </div>
+
+  <!-- live conversation -->
+  <div id="assistant-convo" class="fixed left-1/2 -translate-x-1/2 bottom-4 z-[85] w-[min(560px,94vw)] hidden">
+    <div class="glass rounded-2xl shadow-2xl p-3">
+      <div class="flex items-center justify-between mb-1.5 px-1">
+        <span class="text-sm text-mist-300 flex items-center gap-2 min-w-0">
+          <span id="ai-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+          <span id="ai-status" class="truncate">Hi! Ask me to open a card.</span>
+        </span>
+        <button id="assistant-close" class="icon-btn !w-7 !h-7 shrink-0" title="Close">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="ai-log" class="max-h-44 overflow-y-auto px-1 space-y-1.5 text-base"></div>
+      <form id="ai-form" class="flex items-center gap-2 mt-2">
+        <button type="button" id="ai-mic" class="icon-btn shrink-0" title="Speak">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg>
+        </button>
+        <input id="ai-input" class="field !py-2 text-base" placeholder="Try: open windows shortcuts" autocomplete="off" />
+      </form>
+    </div>
+  </div>
 
   <!-- bootstrap user data for the client app -->
   <script is:inline define:vars={{ user }}>
