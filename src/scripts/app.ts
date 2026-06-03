@@ -298,7 +298,7 @@ function cardHtml(c: Card): string {
       style="background:linear-gradient(160deg, ${h}14, rgba(15,15,17,.92));border:1.5px solid ${h}80;box-shadow:0 12px 30px -18px ${h}, inset 0 1px 0 ${h}1f;">
     <span class="absolute left-0 top-0 h-full w-1" style="background:${h}"></span>
     <div class="flex items-start gap-2 mb-2 pl-1.5">
-      <h3 class="font-heading text-xl leading-snug flex-1 min-w-0 break-words text-mist-100">${esc(c.title)}</h3>
+      <h3 class="font-heading text-xl leading-snug flex-1 min-w-0 truncate text-mist-100" title="${esc(c.title)}">${esc(c.title)}</h3>
       <div class="flex items-center gap-1.5 shrink-0">
         ${c.pinned ? `<span style="color:${h}" title="Pinned">${ICON.pin}</span>` : ''}
         ${c.favorite ? `<span class="drop-shadow" style="color:#fbbf24" title="Favourite">${ICON.starFill}</span>` : ''}
@@ -558,11 +558,37 @@ function closePopovers() {
 /* ============================= MODAL =============================== */
 let modalCardId: string | null = null;
 let saveTimer: number | undefined;
+let modalView: 'write' | 'preview' = 'write';
+
+function setModalView(mode: 'write' | 'preview') {
+  modalView = mode;
+  const ta = document.getElementById('m-content');
+  const pv = document.getElementById('m-preview');
+  const slider = document.getElementById('m-seg-slider') as HTMLElement | null;
+  const wBtn = document.getElementById('seg-write');
+  const pBtn = document.getElementById('seg-preview');
+  if (!ta || !pv || !slider || !wBtn || !pBtn) return;
+  if (mode === 'preview') {
+    updatePreview();
+    pv.classList.remove('hidden');
+    ta.classList.add('hidden');
+    slider.style.transform = 'translateX(100%)';
+  } else {
+    ta.classList.remove('hidden');
+    pv.classList.add('hidden');
+    slider.style.transform = 'translateX(0)';
+  }
+  wBtn.classList.toggle('text-white', mode === 'write');
+  wBtn.classList.toggle('text-mist-300', mode !== 'write');
+  pBtn.classList.toggle('text-white', mode === 'preview');
+  pBtn.classList.toggle('text-mist-300', mode !== 'preview');
+}
 
 function openModal(cardId: string) {
   const found = findCard(cardId);
   if (!found) return;
   modalCardId = cardId;
+  modalView = 'write';
   const root = $('card-modal');
   root.classList.remove('hidden');
   root.innerHTML = modalHtml(found.card);
@@ -623,20 +649,23 @@ function modalHtml(c: Card): string {
       <button id="m-delete" class="btn btn-ghost !py-1.5 !px-2.5 text-sm ml-auto hover:!text-rose-300">${ICON.trash} <span>Delete</span></button>
     </div>
 
-    <!-- body: editor + preview -->
-    <div class="flex-1 grid grid-rows-2 lg:grid-rows-1 lg:grid-cols-2 min-h-0">
-      <div class="flex flex-col min-h-0 p-4 sm:p-5 lg:pr-2.5">
-        <span class="label-sm mb-2">Write — commands, notes, links…</span>
-        <textarea id="m-content" spellcheck="false"
-          class="flex-1 resize-none outline-none rounded-xl bg-black/30 border border-white/10 p-4 text-lg leading-relaxed break-words"
-          placeholder="Type anything here. Paste a command or code snippet and toggle Code for syntax colours. URLs become clickable in the preview →">${esc(c.content)}</textarea>
-      </div>
-      <div class="flex flex-col min-h-0 p-4 sm:p-5 lg:pl-2.5">
-        <span class="label-sm mb-2">Preview</span>
-        <div id="m-preview" class="flex-1 overflow-auto rounded-xl bg-black/20 border border-white/10 p-4 text-lg break-words">${renderContent(c, { full: true })}</div>
-      </div>
+    <!-- body: single pane toggled by the Write / Preview switch -->
+    <div class="flex-1 min-h-0 px-4 sm:px-5 pt-4 pb-3 flex flex-col">
+      <textarea id="m-content" spellcheck="false"
+        class="flex-1 min-h-0 resize-none outline-none rounded-xl bg-black/30 border border-white/10 p-4 text-lg leading-relaxed break-words"
+        placeholder="Type anything here. Paste a command or code snippet and toggle Code for syntax colours. URLs become clickable in the preview.">${esc(c.content)}</textarea>
+      <div id="m-preview" class="hidden flex-1 min-h-0 overflow-auto rounded-xl bg-black/20 border border-white/10 p-4 text-lg break-words">${renderContent(c, { full: true })}</div>
     </div>
-    <div class="px-5 py-2 text-xs text-mist-400 border-t border-white/5">Changes save automatically.</div>
+
+    <!-- write / preview slide switch -->
+    <div class="flex items-center justify-center gap-3 border-t border-white/5 py-2.5">
+      <div class="relative grid grid-cols-2 w-60 p-1 rounded-xl bg-ink-800 border border-ink-600">
+        <span id="m-seg-slider" class="absolute top-1 left-1 bottom-1 w-[calc(50%-0.25rem)] rounded-lg bg-ink-600 transition-transform duration-200 ease-out"></span>
+        <button id="seg-write" class="relative z-10 py-1.5 font-heading text-base text-center text-white">Write</button>
+        <button id="seg-preview" class="relative z-10 py-1.5 font-heading text-base text-center text-mist-300">Preview</button>
+      </div>
+      <span class="text-xs text-mist-400 hidden sm:inline">Saved automatically</span>
+    </div>
   </div>`;
 }
 
@@ -754,6 +783,11 @@ function wireModal() {
     e.stopPropagation();
     openDownloadMenu(c);
   });
+
+  // write / preview switch
+  document.getElementById('seg-write')?.addEventListener('click', () => setModalView('write'));
+  document.getElementById('seg-preview')?.addEventListener('click', () => setModalView('preview'));
+  setModalView(modalView); // apply the current view
 
   // close handlers
   $('card-modal').querySelectorAll('[data-close]').forEach((el) =>

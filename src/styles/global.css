@@ -164,12 +164,25 @@ input, textarea, select, button, kbd {
     color: transparent;
   }
 
-  /* dotted dashboard background — white dots on black */
+  /* dotted dashboard background — white dots on black, pattern rotated 45deg */
   .dotted-bg {
+    position: relative;
     background-color: #050505;
-    background-image: radial-gradient(rgba(255, 255, 255, 0.18) 1.4px, transparent 1.6px);
+  }
+  .dotted-bg > * {
+    position: relative;
+    z-index: 1;
+  }
+  .dotted-bg::before {
+    content: "";
+    position: absolute;
+    inset: -40%;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.28) 1.5px, transparent 1.7px);
     background-size: 22px 22px;
-    background-position: center;
+    transform: rotate(45deg);
+    transform-origin: center;
+    pointer-events: none;
+    z-index: 0;
   }
 
   .label-sm {
