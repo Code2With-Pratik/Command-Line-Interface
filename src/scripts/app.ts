@@ -1285,8 +1285,14 @@ function initAssistant() {
       o.start(); o.stop(ctx.currentTime + 0.4);
     } catch {}
   }
+  const SOUNDS = ['/Voicy_ouch.mp3', '/ohhh.mp3'];
   const playOhh = () => {
-    try { const a = new Audio('/ohhh.mp3'); a.volume = 0.75; a.play().catch(synthOhh); } catch { synthOhh(); }
+    let i = 0;
+    const tryNext = () => {
+      if (i >= SOUNDS.length) { synthOhh(); return; }
+      try { const a = new Audio(SOUNDS[i++]); a.volume = 0.8; a.play().catch(tryNext); } catch { tryNext(); }
+    };
+    tryNext();
   };
 
   // ---- domain-limited command handling (only searches/opens your stuff) ----
