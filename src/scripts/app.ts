@@ -1,0 +1,958 @@
+import { highlight, looksLikeCode, detectLanguage, LANGUAGES, type Language } from '../lib/highlight';
+import { downloadImage, downloadPdf } from '../lib/export';
+
+/* ============================== types ============================== */
+interface Card {
+  id: string;
+  title: string;
+  content: string;
+  color: string;
+  isCode: boolean;
+  language: Language;
+  pinned: boolean;
+  favorite: boolean;
+  position: number;
+  boardId: string;
+}
+interface Board {
+  id: string;
+  name: string;
+  position: number;
+  cards: Card[];
+}
+interface User { id: string; email: string; username: string; }
+
+/* ============================ color palette ========================= */
+const PALETTE: Record<string, { hex: string }> = {
+  violet: { hex: '#7c5cff' }, rose: { hex: '#f43f5e' }, amber: { hex: '#f59e0b' },
+  emerald: { hex: '#10b981' }, sky: { hex: '#0ea5e9' }, fuchsia: { hex: '#d946ef' },
+  lime: { hex: '#84cc16' }, orange: { hex: '#f97316' }, cyan: { hex: '#06b6d4' },
+  indigo: { hex: '#6366f1' },
+};
+const COLOR_NAMES = Object.keys(PALETTE);
+const hex = (c: string) => PALETTE[c]?.hex ?? PALETTE.violet.hex;
+
+/* ============================== state ============================== */
+const state = {
+  user: (window as any).__CLIDESK_USER__ as User,
+  boards: [] as Board[],
+  activeBoardId: null as string | null,
+};
+
+/* ============================ dom helpers ========================== */
+const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+const esc = (s: string) =>
+  s.replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+
+function toast(msg: string, kind: 'ok' | 'err' = 'ok') {
+  const stack = $('toast-stack');
+  const el = document.createElement('div');
+  el.className =
+    'glass px-4 py-2.5 rounded-xl text-base animate-rise shadow-xl ' +
+    (kind === 'err' ? 'text-rose-300 border-rose-500/30' : 'text-mist-100');
+  el.textContent = msg;
+  stack.appendChild(el);
+  setTimeout(() => {
+    el.style.transition = 'opacity .3s, transform .3s';
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(8px)';
+    setTimeout(() => el.remove(), 300);
+  }, 2200);
+}
+
+/* ===================== custom dialogs (prompt/confirm) ===================== */
+type DialogOpts = {
+  kind: 'prompt' | 'confirm';
+  title: string;
+  message?: string;
+  label?: string;
+  value?: string;
+  placeholder?: string;
+  confirmText?: string;
+  danger?: boolean;
+};
+
+function openDialog(o: DialogOpts): Promise<string | boolean | null> {
+  return new Promise((resolve) => {
+    closePopovers();
+    const root = document.createElement('div');
+    root.className = 'fixed inset-0 z-[100] flex items-center justify-center p-4';
+    root.innerHTML = `
+      <div class="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade" data-cancel></div>
+      <div class="dialog-panel relative w-[min(440px,94vw)] glass rounded-2xl p-6 shadow-2xl animate-pop">
+        <h3 class="font-heading text-2xl mb-1">${esc(o.title)}</h3>
+        ${o.message ? `<p class="text-mist-300 text-base mb-4 leading-relaxed">${esc(o.message)}</p>` : '<div class="mb-3"></div>'}
+        ${o.kind === 'prompt'
+          ? `${o.label ? `<label class="label-sm block mb-1.5">${esc(o.label)}</label>` : ''}<input id="dlg-input" class="field mb-5" autocomplete="off" />`
+          : ''}
+        <div class="flex justify-end gap-2">
+          <button class="btn btn-ghost" data-cancel>Cancel</button>
+          <button class="btn ${o.danger ? 'btn-danger' : 'btn-primary'}" data-ok>${esc(o.confirmText || 'OK')}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(root);
+
+    const input = root.querySelector('#dlg-input') as HTMLInputElement | null;
+    if (input) {
+      input.value = o.value ?? '';
+      if (o.placeholder) input.placeholder = o.placeholder;
+    }
+
+    let done = false;
+    const cancelVal = o.kind === 'prompt' ? null : false;
+    const okVal = () => (o.kind === 'prompt' ? input?.value ?? '' : true);
+
+    function finish(result: string | boolean | null) {
+      if (done) return;
+      done = true;
+      document.removeEventListener('keydown', onKey, true);
+      const panel = root.querySelector('.dialog-panel') as HTMLElement;
+      panel.style.transition = 'opacity .15s ease, transform .15s ease';
+      panel.style.opacity = '0';
+      panel.style.transform = 'scale(.96)';
+      setTimeout(() => root.remove(), 150);
+      resolve(result);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault(); e.stopPropagation();
+        finish(cancelVal);
+      } else if (e.key === 'Enter' && (o.kind === 'confirm' || document.activeElement === input)) {
+        e.preventDefault(); e.stopPropagation();
+        finish(okVal());
+      }
+    }
+    document.addEventListener('keydown', onKey, true);
+    root.querySelectorAll('[data-cancel]').forEach((el) =>
+      el.addEventListener('click', () => finish(cancelVal))
+    );
+    root.querySelector('[data-ok]')!.addEventListener('click', () => finish(okVal()));
+
+    requestAnimationFrame(() => {
+      if (input) { input.focus(); input.select(); }
+      else (root.querySelector('[data-ok]') as HTMLElement).focus();
+    });
+  });
+}
+
+const customPrompt = (o: Omit<DialogOpts, 'kind'>) =>
+  openDialog({ ...o, kind: 'prompt' }) as Promise<string | null>;
+const customConfirm = (o: Omit<DialogOpts, 'kind'>) =>
+  openDialog({ ...o, kind: 'confirm' }) as Promise<boolean>;
+
+/* ===================== mobile sidebar (off-canvas) ======================== */
+const sidebarOpen = () => document.getElementById('sidebar')?.classList.contains('is-open') ?? false;
+function openSidebar() {
+  document.getElementById('sidebar')?.classList.add('is-open');
+  document.getElementById('sidebar-backdrop')?.classList.remove('hidden');
+}
+function closeSidebar() {
+  document.getElementById('sidebar')?.classList.remove('is-open');
+  document.getElementById('sidebar-backdrop')?.classList.add('hidden');
+}
+
+/* ============================== api ================================ */
+async function api<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
+  const res = await fetch(path, {
+    headers: { 'content-type': 'application/json' },
+    ...opts,
+  });
+  const body = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    window.location.href = '/';
+    throw new Error('unauthorized');
+  }
+  if (!res.ok) throw new Error((body as any).error || 'Request failed');
+  return body as T;
+}
+
+/* ============================ icons ================================ */
+const ICON = {
+  pin: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>',
+  star: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 2.8 14 8l5.7.8-4.1 4 1 5.6-5.1-2.7-5.1 2.7 1-5.6-4.1-4L9 8z"/></svg>',
+  palette: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.7-.7 1.7-1.6 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H16c3.3 0 6-2.7 6-6 0-4.9-4.5-8-10-8z"/></svg>',
+  edit: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  trash: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+  download: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>',
+  close: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  code: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></svg>',
+  text: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>',
+};
+
+/* ====================== content rendering ========================== */
+const URL_RE = /(https?:\/\/[^\s<]+[^\s<.,;:!?)\]}'"])/g;
+
+function linkify(text: string): string {
+  return esc(text).replace(URL_RE, (u) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`);
+}
+
+// Renders card content: highlighted code block, or prose with clickable links.
+function renderContent(card: Card, opts: { full?: boolean } = {}): string {
+  if (!card.content.trim()) {
+    return `<span class="text-mist-400 italic">${opts.full ? 'Empty — click edit to add content.' : 'No content yet…'}</span>`;
+  }
+  if (card.isCode) {
+    return `<pre class="code-block ${opts.full ? 'p-4' : 'p-3'} overflow-auto"><code>${highlight(card.content, card.language)}</code></pre>`;
+  }
+  return `<div class="rich-content whitespace-pre-wrap break-words leading-relaxed">${linkify(card.content)}</div>`;
+}
+
+/* ============================ accessors ============================ */
+const activeBoard = () => state.boards.find((b) => b.id === state.activeBoardId) || null;
+const findCard = (id: string): { board: Board; card: Card } | null => {
+  for (const b of state.boards) {
+    const c = b.cards.find((x) => x.id === id);
+    if (c) return { board: b, card: c };
+  }
+  return null;
+};
+const sortedCards = (b: Board) =>
+  [...b.cards].sort((a, c) =>
+    a.pinned !== c.pinned ? (a.pinned ? -1 : 1) : a.position - c.position);
+
+/* ============================ rendering ============================ */
+function renderUser() {
+  const u = state.user;
+  $('user-name').textContent = u.username;
+  $('user-email').textContent = u.email;
+  $('user-avatar').textContent = (u.username || u.email || '?').trim().charAt(0).toUpperCase();
+}
+
+function renderTabs() {
+  const list = $('tab-list');
+  if (state.boards.length === 0) {
+    list.innerHTML = `<p class="text-mist-400 text-sm px-2 py-4">No boards yet. Create one above ↑</p>`;
+    return;
+  }
+  list.innerHTML = state.boards
+    .map((b) => {
+      const active = b.id === state.activeBoardId;
+      return `<div class="tab-row group flex items-center rounded-xl ${active ? 'bg-ink-600' : 'hover:bg-white/5'}" data-board="${b.id}">
+        <button class="tab-open flex-1 min-w-0 text-left px-3 py-2.5 flex items-center gap-2" data-board="${b.id}">
+          <span class="w-2 h-2 rounded-full shrink-0" style="background:${active ? 'var(--color-accent-soft)' : '#3a3a44'}"></span>
+          <span class="truncate text-base ${active ? 'text-white' : 'text-mist-200'}">${esc(b.name)}</span>
+          <span class="ml-auto text-xs text-mist-400 shrink-0">${b.cards.length}</span>
+        </button>
+        <button class="tab-rename icon-btn !w-7 !h-7 mr-1 opacity-0 group-hover:opacity-100" title="Rename" data-board="${b.id}">${ICON.edit}</button>
+        <button class="tab-delete icon-btn !w-7 !h-7 mr-2 opacity-0 group-hover:opacity-100" title="Delete" data-board="${b.id}">${ICON.trash}</button>
+      </div>`;
+    })
+    .join('');
+}
+
+function renderBoard() {
+  const b = activeBoard();
+  const titleEl = $('board-title');
+  const countEl = $('card-count');
+  const grid = $('card-grid');
+
+  if (!b) {
+    titleEl.textContent = 'CLIDesk';
+    countEl.textContent = '';
+    grid.innerHTML = `<div class="h-full grid place-items-center text-center">
+      <div class="animate-rise">
+        <p class="font-heading text-3xl mb-2">Welcome, ${esc(state.user.username)} 👋</p>
+        <p class="text-mist-300 text-lg">Create your first board from the sidebar to get started.</p>
+      </div></div>`;
+    return;
+  }
+
+  titleEl.textContent = b.name;
+  const cards = sortedCards(b);
+  countEl.textContent = cards.length ? `· ${cards.length} card${cards.length > 1 ? 's' : ''}` : '';
+
+  if (cards.length === 0) {
+    grid.innerHTML = `<div class="h-full grid place-items-center text-center">
+      <div class="animate-rise">
+        <p class="font-heading text-2xl mb-2">This board is empty</p>
+        <p class="text-mist-300 text-lg mb-5">Add commands, snippets, links or tools as cards.</p>
+        <button class="btn btn-primary text-base" data-add-card>+ Create your first card</button>
+      </div></div>`;
+    return;
+  }
+
+  grid.innerHTML =
+    `<div class="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(270px,1fr))]">` +
+    cards.map(cardHtml).join('') +
+    `</div>`;
+}
+
+function cardHtml(c: Card): string {
+  const h = hex(c.color);
+  // Sticky-note styling: a soft pastel of the card colour with dark, same-hue ink.
+  const bg = `color-mix(in srgb, ${h} 68%, white)`;
+  const ink = `color-mix(in srgb, ${h} 82%, black)`;       // headings / strong text
+  const inkSoft = `color-mix(in srgb, ${h} 58%, black)`;   // body / secondary
+  const u = state.user;
+  const initial = (u.username || u.email || '?').trim().charAt(0).toUpperCase();
+  return `<article class="card-tile group relative rounded-2xl p-4 min-h-[170px] cursor-pointer animate-rise overflow-hidden flex flex-col"
+      data-card="${c.id}"
+      style="background:${bg};color:${ink};box-shadow:0 14px 34px -16px ${h}, 0 2px 6px -2px rgba(0,0,0,.4);">
+    <div class="flex items-start gap-2 mb-2">
+      <h3 class="font-heading text-xl leading-snug flex-1 min-w-0 break-words" style="color:${ink}">${esc(c.title)}</h3>
+      <div class="flex items-center gap-1.5 shrink-0">
+        ${c.pinned ? `<span style="color:${ink}" title="Pinned">${ICON.pin}</span>` : ''}
+        ${c.favorite ? `<span style="color:#d97706" title="Favourite">${ICON.star}</span>` : ''}
+      </div>
+    </div>
+    <div class="text-base flex-1 max-h-[150px] overflow-hidden pointer-events-none [mask-image:linear-gradient(180deg,#000_72%,transparent)]" style="color:${inkSoft}">
+      ${renderContent(c)}
+    </div>
+    <div class="mt-3 pt-2.5 flex items-center gap-2 border-t" style="border-color:${h}59">
+      <span class="w-6 h-6 rounded-full grid place-items-center text-xs font-heading shrink-0" style="background:${ink};color:${bg}">${esc(initial)}</span>
+      <span class="text-sm truncate" style="color:${inkSoft}">${esc(u.username)}</span>
+      ${c.isCode ? `<span class="ml-auto text-[11px] px-2 py-0.5 rounded-md font-medium" style="background:${h}33;color:${ink}">${esc(c.language)}</span>` : ''}
+    </div>
+    <div class="card-actions absolute top-2.5 right-2.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition" data-stop>
+      <button class="mini-btn act-pin" title="${c.pinned ? 'Unpin' : 'Pin'}" data-card="${c.id}" style="${c.pinned ? `color:#fff` : ''}">${ICON.pin}</button>
+      <button class="mini-btn act-fav" title="${c.favorite ? 'Unfavourite' : 'Favourite'}" data-card="${c.id}" style="${c.favorite ? 'color:#fbbf24' : ''}">${ICON.star}</button>
+      <button class="mini-btn act-color" title="Colour" data-card="${c.id}">${ICON.palette}</button>
+      <button class="mini-btn act-edit" title="Edit name" data-card="${c.id}">${ICON.edit}</button>
+    </div>
+  </article>`;
+}
+
+/* small button style injected once */
+const style = document.createElement('style');
+style.textContent = `
+.mini-btn{display:inline-flex;align-items:center;justify-content:center;width:1.85rem;height:1.85rem;border-radius:.55rem;color:#c8c8d2;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(6px);transition:background .15s,color .15s,transform .1s}
+.mini-btn:hover{background:rgba(0,0,0,.7);color:#fff}
+.mini-btn:active{transform:scale(.9)}
+.card-tile{transition:transform .16s ease, box-shadow .16s ease}
+.card-tile:hover{transform:translateY(-3px)}
+.swatch{width:1.6rem;height:1.6rem;border-radius:.5rem;cursor:pointer;border:2px solid transparent;transition:transform .1s}
+.swatch:hover{transform:scale(1.12)}
+.swatch[data-active="1"]{border-color:#fff}
+`;
+document.head.appendChild(style);
+
+function renderAll() {
+  renderUser();
+  renderTabs();
+  renderBoard();
+}
+
+/* ========================= board actions =========================== */
+async function createBoard() {
+  const name = await customPrompt({
+    title: 'Create new board',
+    label: 'Board name',
+    value: `Board ${state.boards.length + 1}`,
+    placeholder: 'e.g. Shell commands',
+    confirmText: 'Create',
+  });
+  if (name === null) return;
+  try {
+    const { board } = await api<{ board: Board }>('/api/boards', {
+      method: 'POST',
+      body: JSON.stringify({ name: name.trim() || 'New Board' }),
+    });
+    state.boards.push(board);
+    state.activeBoardId = board.id;
+    renderAll();
+    closeSidebar();
+    toast('Board created');
+  } catch (e: any) { toast(e.message, 'err'); }
+}
+
+async function renameBoard(id: string) {
+  const b = state.boards.find((x) => x.id === id);
+  if (!b) return;
+  const name = await customPrompt({
+    title: 'Rename board',
+    label: 'Board name',
+    value: b.name,
+    confirmText: 'Rename',
+  });
+  if (name === null) return;
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  try {
+    await api(`/api/boards/${id}`, { method: 'PATCH', body: JSON.stringify({ name: trimmed }) });
+    b.name = trimmed;
+    renderAll();
+  } catch (e: any) { toast(e.message, 'err'); }
+}
+
+async function deleteBoard(id: string) {
+  const b = state.boards.find((x) => x.id === id);
+  if (!b) return;
+  const ok = await customConfirm({
+    title: 'Delete board?',
+    message: `"${b.name}" and all its cards will be permanently deleted. This cannot be undone.`,
+    confirmText: 'Delete',
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await api(`/api/boards/${id}`, { method: 'DELETE' });
+    state.boards = state.boards.filter((x) => x.id !== id);
+    if (state.activeBoardId === id) state.activeBoardId = state.boards[0]?.id ?? null;
+    renderAll();
+    toast('Board deleted');
+  } catch (e: any) { toast(e.message, 'err'); }
+}
+
+/* ========================== card actions =========================== */
+async function createCard() {
+  const b = activeBoard();
+  if (!b) { toast('Create a board first', 'err'); return; }
+  const title = await customPrompt({
+    title: 'Create new card',
+    label: 'Card name',
+    placeholder: 'e.g. git reset --hard',
+    confirmText: 'Create',
+  });
+  if (title === null) return;
+  try {
+    const { card } = await api<{ card: Card }>('/api/cards', {
+      method: 'POST',
+      body: JSON.stringify({ boardId: b.id, title: title.trim() || 'Untitled' }),
+    });
+    b.cards.push(card);
+    renderAll();
+    openModal(card.id); // open immediately so they can add content
+  } catch (e: any) { toast(e.message, 'err'); }
+}
+
+async function patchCard(id: string, data: Partial<Card>) {
+  const found = findCard(id);
+  if (!found) return;
+  Object.assign(found.card, data); // optimistic
+  try {
+    await api(`/api/cards/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  } catch (e: any) { toast(e.message, 'err'); }
+}
+
+async function deleteCard(id: string) {
+  const found = findCard(id);
+  if (!found) return;
+  const ok = await customConfirm({
+    title: 'Delete card?',
+    message: `"${found.card.title}" will be permanently deleted.`,
+    confirmText: 'Delete',
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await api(`/api/cards/${id}`, { method: 'DELETE' });
+    found.board.cards = found.board.cards.filter((c) => c.id !== id);
+    closeModal();
+    renderAll();
+    toast('Card deleted');
+  } catch (e: any) { toast(e.message, 'err'); }
+}
+
+/* ===================== colour & rename popovers ==================== */
+function colorSwatches(active: string): string {
+  return COLOR_NAMES.map(
+    (c) => `<button class="swatch" data-color="${c}" data-active="${c === active ? 1 : 0}" title="${c}" style="background:${hex(c)}"></button>`
+  ).join('');
+}
+
+function openColorPopover(cardId: string, anchor: HTMLElement) {
+  closePopovers();
+  const found = findCard(cardId);
+  if (!found) return;
+  const pop = document.createElement('div');
+  pop.className = 'popover glass rounded-xl p-2.5 shadow-2xl animate-pop';
+  pop.style.position = 'fixed';
+  pop.style.zIndex = '80';
+  pop.innerHTML = `<div class="grid grid-cols-5 gap-2">${colorSwatches(found.card.color)}</div>`;
+  document.body.appendChild(pop);
+  const r = anchor.getBoundingClientRect();
+  pop.style.top = `${Math.min(r.bottom + 6, window.innerHeight - pop.offsetHeight - 10)}px`;
+  pop.style.left = `${Math.min(r.left, window.innerWidth - pop.offsetWidth - 10)}px`;
+
+  pop.querySelectorAll<HTMLElement>('.swatch').forEach((sw) =>
+    sw.addEventListener('click', async () => {
+      const color = sw.dataset.color!;
+      await patchCard(cardId, { color });
+      closePopovers();
+      renderBoard();
+      if (modalCardId === cardId) refreshModalChrome();
+    })
+  );
+}
+
+function closePopovers() {
+  document.querySelectorAll('.popover').forEach((p) => p.remove());
+}
+
+/* ============================= MODAL =============================== */
+let modalCardId: string | null = null;
+let saveTimer: number | undefined;
+
+function openModal(cardId: string) {
+  const found = findCard(cardId);
+  if (!found) return;
+  modalCardId = cardId;
+  const root = $('card-modal');
+  root.classList.remove('hidden');
+  root.innerHTML = modalHtml(found.card);
+  // force reflow for animation then add visible
+  requestAnimationFrame(() => root.querySelector('.modal-panel')?.classList.add('modal-in'));
+  wireModal();
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  if (saveTimer) { clearTimeout(saveTimer); flushSave(); }
+  const root = $('card-modal');
+  const panel = root.querySelector('.modal-panel');
+  if (panel) {
+    panel.classList.remove('modal-in');
+    panel.classList.add('modal-out');
+    setTimeout(() => { root.classList.add('hidden'); root.innerHTML = ''; }, 200);
+  } else {
+    root.classList.add('hidden');
+    root.innerHTML = '';
+  }
+  modalCardId = null;
+  document.body.style.overflow = '';
+  renderBoard();
+}
+
+function modalHtml(c: Card): string {
+  const h = hex(c.color);
+  return `
+  <div class="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade" data-close></div>
+  <div class="modal-panel relative mx-auto my-[3vh] h-[94vh] w-[min(1000px,94vw)] flex flex-col rounded-3xl overflow-hidden glass shadow-2xl"
+       style="border:1px solid ${h}55;">
+    <div class="h-1.5 w-full" style="background:linear-gradient(90deg, ${h}, ${h}55)"></div>
+
+    <!-- header -->
+    <header class="flex items-center gap-3 px-5 py-3 border-b border-white/5">
+      <span class="w-3 h-3 rounded-full shrink-0" style="background:${h}"></span>
+      <input id="m-title" class="flex-1 min-w-0 bg-transparent font-heading text-2xl outline-none" value="${esc(c.title)}" />
+      <div class="flex items-center gap-2 shrink-0">
+        <div class="relative">
+          <button id="m-download" class="icon-btn" title="Download">${ICON.download}</button>
+        </div>
+        <button id="m-close" class="icon-btn" title="Close (Esc)" data-close>${ICON.close}</button>
+      </div>
+    </header>
+
+    <!-- toolbar -->
+    <div class="flex flex-wrap items-center gap-2 px-5 py-2.5 border-b border-white/5 text-sm">
+      <div class="flex items-center gap-1.5">${colorSwatches(c.color)}</div>
+      <span class="w-px h-6 bg-white/10 mx-1"></span>
+      <button id="m-code" title="Toggle between code and plain text" class="btn btn-ghost !py-1.5 !px-2.5 text-sm"><span id="m-code-icon">${c.isCode ? ICON.text : ICON.code}</span> <span id="m-code-label">${c.isCode ? 'Text' : 'Code'}</span></button>
+      <select id="m-lang" class="field !w-auto !py-1.5 !px-2 text-sm ${c.isCode ? '' : 'hidden'}">
+        ${LANGUAGES.map((l) => `<option value="${l}" ${l === c.language ? 'selected' : ''}>${l}</option>`).join('')}
+      </select>
+      <span class="w-px h-6 bg-white/10 mx-1"></span>
+      <button id="m-pin" class="btn btn-ghost !py-1.5 !px-2.5 text-sm ${c.pinned ? '!border-accent/40' : ''}" style="${c.pinned ? `color:${h}` : ''}">${ICON.pin} <span>${c.pinned ? 'Pinned' : 'Pin'}</span></button>
+      <button id="m-fav" class="btn btn-ghost !py-1.5 !px-2.5 text-sm" style="${c.favorite ? 'color:#f5c518' : ''}">${ICON.star} <span>${c.favorite ? 'Starred' : 'Star'}</span></button>
+      <button id="m-delete" class="btn btn-ghost !py-1.5 !px-2.5 text-sm ml-auto hover:!text-rose-300">${ICON.trash} <span>Delete</span></button>
+    </div>
+
+    <!-- body: editor + preview -->
+    <div class="flex-1 grid grid-rows-2 lg:grid-rows-1 lg:grid-cols-2 min-h-0">
+      <div class="flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r border-white/5">
+        <span class="label-sm px-5 pt-3 pb-1">Write — commands, notes, links…</span>
+        <textarea id="m-content" spellcheck="false"
+          class="flex-1 resize-none bg-transparent outline-none px-5 pb-5 pt-1 text-lg leading-relaxed"
+          placeholder="Type anything here. Paste a command or code snippet and toggle Code for syntax colours. URLs become clickable in the preview →">${esc(c.content)}</textarea>
+      </div>
+      <div class="flex flex-col min-h-0">
+        <span class="label-sm px-5 pt-3 pb-1">Preview</span>
+        <div id="m-preview" class="flex-1 overflow-auto px-5 pb-5 pt-1 text-lg">${renderContent(c, { full: true })}</div>
+      </div>
+    </div>
+    <div class="px-5 py-1.5 text-xs text-mist-400 border-t border-white/5">Changes save automatically.</div>
+  </div>`;
+}
+
+function currentModalCard(): Card | null {
+  return modalCardId ? findCard(modalCardId)?.card ?? null : null;
+}
+
+function updatePreview() {
+  const c = currentModalCard();
+  if (!c) return;
+  $('m-preview').innerHTML = renderContent(c, { full: true });
+}
+
+function refreshModalChrome() {
+  // re-render whole modal to reflect color/pin/fav/code without losing focus is overkill;
+  // just update accent-dependent bits cheaply by reopening preview + swatches active state.
+  const c = currentModalCard();
+  if (!c) return;
+  document.querySelectorAll<HTMLElement>('#card-modal .swatch').forEach((sw) => {
+    sw.dataset.active = sw.dataset.color === c.color ? '1' : '0';
+  });
+  updatePreview();
+}
+
+function scheduleSave() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(flushSave, 500);
+}
+
+function flushSave() {
+  const c = currentModalCard();
+  if (!c) return;
+  const titleEl = document.getElementById('m-title') as HTMLInputElement | null;
+  const contentEl = document.getElementById('m-content') as HTMLTextAreaElement | null;
+  if (!titleEl || !contentEl) return;
+  const title = titleEl.value.trim() || 'Untitled';
+  const content = contentEl.value;
+  patchCard(c.id, { title, content, isCode: c.isCode, language: c.language });
+}
+
+function wireModal() {
+  const c = currentModalCard();
+  if (!c) return;
+
+  const titleEl = $('m-title') as HTMLInputElement;
+  const contentEl = $('m-content') as HTMLTextAreaElement;
+  titleEl.focus();
+
+  titleEl.addEventListener('input', scheduleSave);
+
+  contentEl.addEventListener('input', () => {
+    c.content = contentEl.value;
+    // auto-detect code on the fly (only flips ON automatically)
+    if (!c.isCode && looksLikeCode(contentEl.value)) {
+      c.isCode = true;
+      c.language = detectLanguage(contentEl.value);
+      syncCodeUi();
+    }
+    updatePreview();
+    scheduleSave();
+  });
+
+  // colour swatches
+  document.querySelectorAll<HTMLElement>('#card-modal .swatch').forEach((sw) =>
+    sw.addEventListener('click', async () => {
+      c.color = sw.dataset.color!;
+      refreshModalChrome();
+      // recolor header/border live
+      const h = hex(c.color);
+      const panel = $('card-modal').querySelector('.modal-panel') as HTMLElement;
+      panel.style.borderColor = `${h}55`;
+      (panel.querySelector('div') as HTMLElement).style.background = `linear-gradient(90deg, ${h}, ${h}55)`;
+      (panel.querySelector('header span') as HTMLElement).style.background = h;
+      await patchCard(c.id, { color: c.color });
+    })
+  );
+
+  const codeBtn = $('m-code');
+  const langSel = $('m-lang') as HTMLSelectElement;
+  function syncCodeUi() {
+    // The button is a toggle: label shows what clicking will switch the card TO.
+    const iconEl = document.getElementById('m-code-icon');
+    const labelEl = document.getElementById('m-code-label');
+    if (iconEl) iconEl.innerHTML = c.isCode ? ICON.text : ICON.code;
+    if (labelEl) labelEl.textContent = c.isCode ? 'Text' : 'Code';
+    langSel.classList.toggle('hidden', !c.isCode);
+    langSel.value = c.language;
+  }
+  codeBtn.addEventListener('click', () => {
+    c.isCode = !c.isCode;
+    if (c.isCode && c.language === 'plaintext') c.language = detectLanguage(c.content) || 'plaintext';
+    syncCodeUi();
+    updatePreview();
+    patchCard(c.id, { isCode: c.isCode, language: c.language });
+  });
+  langSel.addEventListener('change', () => {
+    c.language = langSel.value as Language;
+    updatePreview();
+    patchCard(c.id, { language: c.language });
+  });
+
+  $('m-pin').addEventListener('click', async () => {
+    await patchCard(c.id, { pinned: !c.pinned });
+    reopenModalPreserve();
+  });
+  $('m-fav').addEventListener('click', async () => {
+    await patchCard(c.id, { favorite: !c.favorite });
+    reopenModalPreserve();
+  });
+  $('m-delete').addEventListener('click', () => deleteCard(c.id));
+
+  // download menu
+  $('m-download').addEventListener('click', (e) => {
+    e.stopPropagation();
+    openDownloadMenu(c);
+  });
+
+  // close handlers
+  $('card-modal').querySelectorAll('[data-close]').forEach((el) =>
+    el.addEventListener('click', closeModal)
+  );
+}
+
+// some toggles benefit from a light re-render of the toolbar labels
+function reopenModalPreserve() {
+  const c = currentModalCard();
+  if (!c) return;
+  const contentEl = document.getElementById('m-content') as HTMLTextAreaElement | null;
+  const titleEl = document.getElementById('m-title') as HTMLInputElement | null;
+  const scroll = (document.getElementById('m-content') as HTMLElement)?.scrollTop ?? 0;
+  const caret = contentEl?.selectionStart ?? 0;
+  const root = $('card-modal');
+  root.innerHTML = modalHtml(c);
+  root.querySelector('.modal-panel')?.classList.add('modal-in');
+  wireModal();
+  const newContent = document.getElementById('m-content') as HTMLTextAreaElement;
+  if (newContent && contentEl) { newContent.scrollTop = scroll; newContent.setSelectionRange(caret, caret); }
+}
+
+function openDownloadMenu(c: Card) {
+  closePopovers();
+  const anchor = $('m-download');
+  const pop = document.createElement('div');
+  pop.className = 'popover glass rounded-xl p-1.5 shadow-2xl animate-pop';
+  pop.style.position = 'fixed';
+  pop.style.zIndex = '90';
+  pop.innerHTML = `
+    <button class="dl-png btn btn-ghost w-full justify-start text-sm !py-2">🖼  Download as PNG image</button>
+    <button class="dl-pdf btn btn-ghost w-full justify-start text-sm !py-2 mt-1">📄  Download as PDF</button>`;
+  document.body.appendChild(pop);
+  const r = anchor.getBoundingClientRect();
+  pop.style.top = `${r.bottom + 6}px`;
+  pop.style.left = `${Math.min(r.left, window.innerWidth - pop.offsetWidth - 10)}px`;
+
+  pop.querySelector('.dl-png')!.addEventListener('click', async () => {
+    closePopovers();
+    try {
+      await downloadImage($('m-preview'), c.title);
+      toast('Image downloaded');
+    } catch { toast('Could not export image', 'err'); }
+  });
+  pop.querySelector('.dl-pdf')!.addEventListener('click', () => {
+    closePopovers();
+    downloadPdf(c.title, renderContent(c, { full: true }));
+  });
+}
+
+/* modal animation styles */
+const modalStyle = document.createElement('style');
+modalStyle.textContent = `
+.modal-panel{opacity:0;transform:scale(.94) translateY(20px);transition:opacity .26s cubic-bezier(.22,1,.36,1), transform .26s cubic-bezier(.22,1,.36,1)}
+.modal-panel.modal-in{opacity:1;transform:scale(1) translateY(0)}
+.modal-panel.modal-out{opacity:0;transform:scale(.96) translateY(10px)}
+`;
+document.head.appendChild(modalStyle);
+
+/* ============================= SEARCH ============================== */
+let searchIndex = 0;
+let searchResults: Array<{ type: 'board' | 'card'; board: Board; card?: Card; label: string; sub: string }> = [];
+
+function openSearch() {
+  const root = $('search-overlay');
+  root.classList.remove('hidden');
+  root.innerHTML = `
+    <div class="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade" data-close></div>
+    <div class="relative mx-auto mt-[12vh] w-[min(680px,92vw)] glass rounded-2xl shadow-2xl overflow-hidden animate-pop">
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-white/5">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9a9aa6" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="s-input" class="flex-1 bg-transparent outline-none text-xl" placeholder="Search boards, cards, commands, code…" autocomplete="off" />
+        <span class="text-xs text-mist-400 border border-white/10 rounded px-1.5 py-0.5">Esc</span>
+      </div>
+      <div id="s-results" class="max-h-[52vh] overflow-y-auto p-2"></div>
+    </div>`;
+  root.querySelectorAll('[data-close]').forEach((el) => el.addEventListener('click', closeSearch));
+  const input = $('s-input') as HTMLInputElement;
+  input.addEventListener('input', () => runSearch(input.value));
+  input.focus();
+  runSearch('');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeSearch() {
+  $('search-overlay').classList.add('hidden');
+  $('search-overlay').innerHTML = '';
+  document.body.style.overflow = modalCardId ? 'hidden' : '';
+}
+
+function runSearch(q: string) {
+  const query = q.trim().toLowerCase();
+  const results: typeof searchResults = [];
+
+  for (const b of state.boards) {
+    if (!query || b.name.toLowerCase().includes(query)) {
+      results.push({ type: 'board', board: b, label: b.name, sub: `Board · ${b.cards.length} cards` });
+    }
+    for (const c of b.cards) {
+      const hay = `${c.title}\n${c.content}\n${c.language}`.toLowerCase();
+      if (!query || hay.includes(query)) {
+        results.push({
+          type: 'card', board: b, card: c, label: c.title,
+          sub: `${b.name}${c.isCode ? ' · ' + c.language : ''}`,
+        });
+      }
+    }
+  }
+  searchResults = results.slice(0, 50);
+  searchIndex = 0;
+  renderSearchResults(query);
+}
+
+function highlightMatch(text: string, q: string): string {
+  if (!q) return esc(text);
+  const i = text.toLowerCase().indexOf(q);
+  if (i < 0) return esc(text);
+  return esc(text.slice(0, i)) + `<mark class="bg-accent/40 text-white rounded px-0.5">` + esc(text.slice(i, i + q.length)) + `</mark>` + esc(text.slice(i + q.length));
+}
+
+function renderSearchResults(query: string) {
+  const box = $('s-results');
+  if (searchResults.length === 0) {
+    box.innerHTML = `<p class="text-mist-400 text-center py-8 text-base">No matches.</p>`;
+    return;
+  }
+  box.innerHTML = searchResults
+    .map((r, i) => {
+      const h = r.card ? hex(r.card.color) : '#7c5cff';
+      const icon = r.type === 'board'
+        ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>`
+        : `<span class="w-3 h-3 rounded-full" style="background:${h}"></span>`;
+      const snippet = r.card && r.card.content
+        ? `<div class="text-mist-400 text-xs truncate mt-0.5">${highlightMatch(r.card.content.replace(/\s+/g, ' ').slice(0, 90), query)}</div>` : '';
+      return `<button class="s-item w-full text-left flex items-start gap-3 px-3 py-2.5 rounded-xl ${i === searchIndex ? 'bg-ink-600' : 'hover:bg-white/5'}" data-idx="${i}">
+        <span class="mt-1 shrink-0 text-mist-300">${icon}</span>
+        <span class="min-w-0 flex-1">
+          <span class="block truncate text-base text-mist-100">${highlightMatch(r.label, query)}</span>
+          <span class="block truncate text-xs text-mist-400">${esc(r.sub)}</span>
+          ${snippet}
+        </span>
+        <span class="text-[10px] text-mist-400 mt-1 shrink-0 uppercase tracking-wide">${r.type}</span>
+      </button>`;
+    })
+    .join('');
+
+  box.querySelectorAll<HTMLElement>('.s-item').forEach((el) =>
+    el.addEventListener('click', () => activateSearch(Number(el.dataset.idx)))
+  );
+}
+
+function activateSearch(i: number) {
+  const r = searchResults[i];
+  if (!r) return;
+  state.activeBoardId = r.board.id;
+  renderAll();
+  closeSearch();
+  if (r.type === 'card' && r.card) {
+    setTimeout(() => openModal(r.card!.id), 120);
+  }
+}
+
+/* ============================ global events ======================== */
+function wireGlobal() {
+  $('new-board-btn').addEventListener('click', createBoard);
+  $('add-card-btn').addEventListener('click', createCard);
+  $('open-search-btn').addEventListener('click', () => { closeSidebar(); openSearch(); });
+  $('logout-btn').addEventListener('click', async () => {
+    await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    window.location.href = '/';
+  });
+
+  // mobile sidebar overlay
+  $('sidebar-toggle').addEventListener('click', () => (sidebarOpen() ? closeSidebar() : openSidebar()));
+  $('sidebar-backdrop').addEventListener('click', closeSidebar);
+
+  // tab list delegation
+  $('tab-list').addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    const open = t.closest('.tab-open') as HTMLElement | null;
+    const rename = t.closest('.tab-rename') as HTMLElement | null;
+    const del = t.closest('.tab-delete') as HTMLElement | null;
+    if (rename) { renameBoard(rename.dataset.board!); return; }
+    if (del) { deleteBoard(del.dataset.board!); return; }
+    if (open) { state.activeBoardId = open.dataset.board!; renderAll(); closeSidebar(); }
+  });
+  // double-click tab to rename
+  $('tab-list').addEventListener('dblclick', (e) => {
+    const row = (e.target as HTMLElement).closest('.tab-open') as HTMLElement | null;
+    if (row) renameBoard(row.dataset.board!);
+  });
+
+  // card grid delegation
+  $('card-grid').addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    if (t.closest('[data-add-card]')) { createCard(); return; }
+
+    const actBtn = t.closest('.act-pin, .act-fav, .act-color, .act-edit') as HTMLElement | null;
+    if (actBtn) {
+      e.stopPropagation();
+      const id = actBtn.dataset.card!;
+      const found = findCard(id);
+      if (!found) return;
+      if (actBtn.classList.contains('act-pin')) { patchCard(id, { pinned: !found.card.pinned }).then(renderBoard); }
+      else if (actBtn.classList.contains('act-fav')) { patchCard(id, { favorite: !found.card.favorite }).then(renderBoard); }
+      else if (actBtn.classList.contains('act-color')) { openColorPopover(id, actBtn); }
+      else if (actBtn.classList.contains('act-edit')) { editCardName(id); }
+      return;
+    }
+
+    const tile = t.closest('.card-tile') as HTMLElement | null;
+    if (tile) openModal(tile.dataset.card!);
+  });
+
+  // close popovers on outside click
+  document.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    if (!t.closest('.popover') && !t.closest('.act-color') && !t.closest('#m-download')) closePopovers();
+  });
+
+  // keyboard
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      if ($('search-overlay').classList.contains('hidden')) openSearch();
+      else closeSearch();
+      return;
+    }
+    if (e.key === 'Escape') {
+      if (!$('search-overlay').classList.contains('hidden')) { closeSearch(); return; }
+      if (document.querySelector('.popover')) { closePopovers(); return; }
+      if (modalCardId) { closeModal(); return; }
+      if (sidebarOpen()) { closeSidebar(); return; }
+    }
+    // search navigation
+    if (!$('search-overlay').classList.contains('hidden')) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); searchIndex = Math.min(searchIndex + 1, searchResults.length - 1); renderSearchResults(($('s-input') as HTMLInputElement).value.trim().toLowerCase()); scrollActive(); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); searchIndex = Math.max(searchIndex - 1, 0); renderSearchResults(($('s-input') as HTMLInputElement).value.trim().toLowerCase()); scrollActive(); }
+      if (e.key === 'Enter') { e.preventDefault(); activateSearch(searchIndex); }
+    }
+  });
+}
+
+function scrollActive() {
+  document.querySelector('.s-item.bg-ink-600')?.scrollIntoView({ block: 'nearest' });
+}
+
+async function editCardName(id: string) {
+  const found = findCard(id);
+  if (!found) return;
+  const name = await customPrompt({
+    title: 'Rename card',
+    label: 'Card name',
+    value: found.card.title,
+    confirmText: 'Rename',
+  });
+  if (name === null) return;
+  await patchCard(id, { title: name.trim() || 'Untitled' });
+  renderBoard();
+}
+
+/* ============================== boot =============================== */
+async function boot() {
+  wireGlobal();
+  renderUser();
+  try {
+    const data = await api<{ user: User; boards: Board[] }>('/api/data');
+    state.user = data.user;
+    state.boards = data.boards;
+    state.activeBoardId = data.boards[0]?.id ?? null;
+  } catch (e: any) {
+    toast(e.message || 'Could not load your data', 'err');
+  }
+  renderAll();
+}
+
+boot();
