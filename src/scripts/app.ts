@@ -674,7 +674,7 @@ function modalHtml(c: Card): string {
       <div class="flex items-center gap-1.5">${colorSwatches(c.color)}</div>
       <span class="w-px h-6 bg-white/10 mx-1"></span>
       <button id="m-code" title="Toggle between code and plain text" class="btn btn-ghost !py-1.5 !px-2.5 text-sm min-w-[6rem]"><span id="m-code-icon">${c.isCode ? ICON.text : ICON.code}</span> <span id="m-code-label">${c.isCode ? 'Text' : 'Code'}</span></button>
-      <select id="m-font" class="field !w-auto !py-1.5 !px-2 text-sm" title="Card font">
+      <select id="m-font" class="field !w-40 !py-1.5 !px-2 text-sm truncate" title="Card font">
         ${FONTS.map((f) => `<option value="${esc(f)}" ${f === fontOf(c) ? 'selected' : ''} style="font-family:'${f}'">${esc(f)}</option>`).join('')}
       </select>
       <span class="w-px h-6 bg-white/10 mx-1"></span>
