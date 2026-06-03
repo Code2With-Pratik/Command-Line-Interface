@@ -1,4 +1,4 @@
-# CLIDesk
+# CLIDesk 
 
 > Your personal, authenticated vault for **commands, shortcuts, snippets, websites, tools & links** — organised into boards, colour‑coded, searchable with `Ctrl/⌘ + K`, and exportable to image or PDF.
 
