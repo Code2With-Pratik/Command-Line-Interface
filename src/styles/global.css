@@ -1,0 +1,250 @@
+@import "tailwindcss";
+
+/* ----------------------------------------------------------------------------
+   CLIDesk — design tokens
+---------------------------------------------------------------------------- */
+@theme {
+  --font-heading: "Merienda", cursive;
+  --font-body: "Indie Flower", cursive;
+
+  /* dark surface scale */
+  --color-ink-950: #050505;
+  --color-ink-900: #0a0a0b;
+  --color-ink-850: #0f0f11;
+  --color-ink-800: #141417;
+  --color-ink-700: #1b1b20;
+  --color-ink-600: #26262d;
+  --color-ink-500: #34343d;
+
+  --color-mist-400: #6b6b76;
+  --color-mist-300: #9a9aa6;
+  --color-mist-200: #c8c8d2;
+  --color-mist-100: #ededf2;
+
+  --color-accent: #7c5cff;
+  --color-accent-soft: #a48bff;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(1200px 800px at 80% -10%, #15131f 0%, transparent 55%),
+    radial-gradient(1000px 700px at -10% 110%, #11131c 0%, transparent 55%),
+    #050505;
+  color: var(--color-mist-100);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: 0.2px;
+}
+
+h1, h2, h3, h4, .font-heading {
+  font-family: var(--font-heading);
+}
+
+/* form controls don't inherit font-family by default */
+input, textarea, select, button, kbd {
+  font-family: var(--font-body);
+}
+.code-block, .code-block * {
+  font-family: "SFMono-Regular", ui-monospace, "JetBrains Mono", Consolas, monospace !important;
+}
+
+/* scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a31 transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: #2a2a31; border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: #3a3a44; background-clip: content-box; }
+
+/* focus ring */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ----------------------------------------------------------------------------
+   Reusable component classes
+---------------------------------------------------------------------------- */
+@layer components {
+  .glass {
+    background: rgba(20, 20, 23, 0.72);
+    backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border-radius: 0.75rem;
+    padding: 0.55rem 0.95rem;
+    font-family: var(--font-body);
+    font-size: 1.05rem;
+    color: var(--color-mist-100);
+    transition: transform 0.12s ease, background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+    border: 1px solid transparent;
+    cursor: pointer;
+    user-select: none;
+  }
+  .btn:active { transform: translateY(1px) scale(0.99); }
+
+  .btn-primary {
+    background: linear-gradient(180deg, var(--color-accent-soft), var(--color-accent));
+    color: #0c0a18;
+    font-weight: 700;
+    box-shadow: 0 8px 22px -10px rgba(124, 92, 255, 0.8);
+  }
+  .btn-primary:hover { filter: brightness(1.06); }
+
+  .btn-ghost {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  .btn-ghost:hover { background: rgba(255, 255, 255, 0.09); }
+
+  .btn-danger {
+    background: linear-gradient(180deg, #fb7185, #e11d48);
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 8px 22px -10px rgba(225, 29, 72, 0.8);
+  }
+  .btn-danger:hover { filter: brightness(1.06); }
+
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.3rem;
+    height: 2.3rem;
+    border-radius: 0.7rem;
+    color: var(--color-mist-200);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    transition: background 0.18s ease, color 0.18s ease, transform 0.12s ease;
+    cursor: pointer;
+  }
+  .icon-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+  .icon-btn:active { transform: scale(0.93); }
+
+  .field {
+    width: 100%;
+    background: rgba(8, 8, 10, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 0.8rem;
+    padding: 0.7rem 0.95rem;
+    color: var(--color-mist-100);
+    font-family: var(--font-body);
+    font-size: 1.1rem;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .field::placeholder { color: var(--color-mist-400); }
+  .field:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.18);
+  }
+
+  .label-sm {
+    font-size: 0.95rem;
+    color: var(--color-mist-300);
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   Animations
+---------------------------------------------------------------------------- */
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.9) translateY(18px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-pop { animation: pop-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-fade { animation: fade-in 0.2s ease both; }
+.animate-rise { animation: rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* ----------------------------------------------------------------------------
+   Mobile — sidebar becomes an off-canvas overlay (< 768px)
+---------------------------------------------------------------------------- */
+@media (max-width: 767px) {
+  #sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 84vw;
+    max-width: 320px;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+  }
+  #sidebar.is-open {
+    transform: translateX(0);
+    box-shadow: 0 0 80px rgba(0, 0, 0, 0.7);
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   VS Code "Dark+" syntax theme (used by lib/highlight.js)
+---------------------------------------------------------------------------- */
+.code-block {
+  font-family: "SFMono-Regular", ui-monospace, "JetBrains Mono", Consolas, monospace;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  letter-spacing: 0;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  tab-size: 2;
+}
+.code-block .tok-keyword   { color: #569cd6; }
+.code-block .tok-control   { color: #c586c0; }
+.code-block .tok-string    { color: #ce9178; }
+.code-block .tok-number    { color: #b5cea8; }
+.code-block .tok-comment   { color: #6a9955; font-style: italic; }
+.code-block .tok-function  { color: #dcdcaa; }
+.code-block .tok-type      { color: #4ec9b0; }
+.code-block .tok-builtin   { color: #4fc1ff; }
+.code-block .tok-property  { color: #9cdcfe; }
+.code-block .tok-operator  { color: #d4d4d4; }
+.code-block .tok-punct     { color: #d4d4d4; }
+.code-block .tok-tag       { color: #569cd6; }
+.code-block .tok-attr      { color: #9cdcfe; }
+.code-block .tok-regex     { color: #d16969; }
+
+/* links inside card content */
+.rich-content a {
+  color: var(--color-accent-soft);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-word;
+}
+.rich-content a:hover { color: #c3b3ff; }
+
+/* On the coloured sticky-note tiles, links inherit the card's dark ink so they
+   stay readable (the full-screen preview keeps the accent colour). */
+.card-tile .rich-content a {
+  color: inherit;
+  text-decoration-thickness: 1px;
+  opacity: 0.85;
+}
