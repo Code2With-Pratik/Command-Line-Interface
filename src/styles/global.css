@@ -73,6 +73,20 @@ input, textarea, select, button, kbd {
   border-radius: 6px;
 }
 
+/* inside the card popup, focus uses the card's own colour (set per-card) */
+#card-modal #m-title:focus,
+#card-modal #m-content:focus {
+  outline: 2px solid var(--card-accent, var(--color-accent));
+  outline-offset: 2px;
+}
+#card-modal #m-title:focus {
+  border-color: var(--card-accent, var(--color-accent));
+}
+#card-modal .field:focus {
+  border-color: var(--card-accent, var(--color-accent));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--card-accent, var(--color-accent)) 22%, transparent);
+}
+
 /* ----------------------------------------------------------------------------
    Reusable component classes
 ---------------------------------------------------------------------------- */

@@ -82,19 +82,38 @@ function openDialog(o: DialogOpts): Promise<string | boolean | null> {
     closePopovers();
     const root = document.createElement('div');
     root.className = 'fixed inset-0 z-[100] flex items-center justify-center p-4';
-    root.innerHTML = `
-      <div class="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade" data-cancel></div>
-      <div class="dialog-panel relative w-[min(440px,94vw)] glass rounded-2xl p-6 shadow-2xl animate-pop">
-        <h3 class="font-heading text-2xl mb-1">${esc(o.title)}</h3>
-        ${o.message ? `<p class="text-mist-300 text-base mb-4 leading-relaxed">${esc(o.message)}</p>` : '<div class="mb-3"></div>'}
-        ${o.kind === 'prompt'
-          ? `${o.label ? `<label class="label-sm block mb-1.5">${esc(o.label)}</label>` : ''}<input id="dlg-input" class="field mb-5" autocomplete="off" />`
-          : ''}
-        <div class="flex justify-end gap-2">
-          <button class="btn btn-ghost" data-cancel>Cancel</button>
-          <button class="btn ${o.danger ? 'btn-danger' : 'btn-primary'}" data-ok>${esc(o.confirmText || 'OK')}</button>
-        </div>
-      </div>`;
+
+    const bigTrash = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/></svg>';
+    const bigInfo = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>';
+
+    if (o.kind === 'confirm') {
+      // square, iOS-style alert
+      const tint = o.danger ? 'rgba(244,63,94,.15)' : 'rgba(249,115,22,.15)';
+      const fg = o.danger ? '#fb7185' : '#fbbf24';
+      root.innerHTML = `
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade" data-cancel></div>
+        <div class="dialog-panel relative w-[min(330px,90vw)] glass rounded-3xl p-7 shadow-2xl animate-pop text-center">
+          <div class="mx-auto mb-4 w-14 h-14 rounded-2xl grid place-items-center" style="background:${tint};color:${fg}">${o.danger ? bigTrash : bigInfo}</div>
+          <h3 class="font-heading text-2xl mb-1.5">${esc(o.title)}</h3>
+          ${o.message ? `<p class="text-mist-300 text-base mb-6 leading-relaxed">${esc(o.message)}</p>` : '<div class="mb-5"></div>'}
+          <div class="grid grid-cols-2 gap-2.5">
+            <button class="btn btn-ghost w-full justify-center" data-cancel>Cancel</button>
+            <button class="btn ${o.danger ? 'btn-danger' : 'btn-primary'} w-full justify-center" data-ok>${esc(o.confirmText || 'OK')}</button>
+          </div>
+        </div>`;
+    } else {
+      root.innerHTML = `
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade" data-cancel></div>
+        <div class="dialog-panel relative w-[min(420px,94vw)] glass rounded-2xl p-6 shadow-2xl animate-pop">
+          <h3 class="font-heading text-2xl mb-1">${esc(o.title)}</h3>
+          ${o.message ? `<p class="text-mist-300 text-base mb-4 leading-relaxed">${esc(o.message)}</p>` : '<div class="mb-3"></div>'}
+          ${o.label ? `<label class="label-sm block mb-1.5">${esc(o.label)}</label>` : ''}<input id="dlg-input" class="field mb-5" autocomplete="off" />
+          <div class="flex justify-end gap-2">
+            <button class="btn btn-ghost" data-cancel>Cancel</button>
+            <button class="btn btn-primary" data-ok>${esc(o.confirmText || 'OK')}</button>
+          </div>
+        </div>`;
+    }
     document.body.appendChild(root);
 
     const input = root.querySelector('#dlg-input') as HTMLInputElement | null;
@@ -293,7 +312,7 @@ function renderBoard() {
 function cardHtml(c: Card): string {
   const h = hex(c.color);
   // Coloured border on a dark surface (not a fully coloured card).
-  return `<article class="card-tile group relative rounded-2xl p-4 min-h-[160px] cursor-pointer animate-rise overflow-hidden flex flex-col ${selectedCardIds.has(c.id) ? 'is-selected' : ''}"
+  return `<article class="card-tile group relative rounded-2xl p-4 h-[210px] cursor-pointer animate-rise overflow-hidden flex flex-col ${selectedCardIds.has(c.id) ? 'is-selected' : ''}"
       data-card="${c.id}"
       style="background:linear-gradient(160deg, ${h}14, rgba(15,15,17,.92));border:1.5px solid ${h}80;box-shadow:0 12px 30px -18px ${h}, inset 0 1px 0 ${h}1f;">
     <span class="absolute left-0 top-0 h-full w-1" style="background:${h}"></span>
@@ -304,7 +323,7 @@ function cardHtml(c: Card): string {
         ${c.favorite ? `<span class="drop-shadow" style="color:#fbbf24" title="Favourite">${ICON.starFill}</span>` : ''}
       </div>
     </div>
-    <div class="pl-1.5 pb-1 text-base text-mist-300 flex-1 max-h-[160px] overflow-hidden pointer-events-none [mask-image:linear-gradient(180deg,#000_74%,transparent)]">
+    <div class="pl-1.5 pb-1 text-base text-mist-300 flex-1 min-h-0 overflow-hidden pointer-events-none [mask-image:linear-gradient(180deg,#000_74%,transparent)]">
       ${renderContent(c)}
     </div>
     ${c.isCode ? `<span class="absolute bottom-3 right-3 text-[11px] px-2 py-0.5 rounded-md font-medium" style="background:${h}26;color:${h}">${esc(c.language)}</span>` : ''}
@@ -620,7 +639,7 @@ function modalHtml(c: Card): string {
   return `
   <div class="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade" data-close></div>
   <div class="modal-panel relative mx-auto my-[3vh] h-[94vh] w-[min(1000px,94vw)] flex flex-col rounded-3xl overflow-hidden glass shadow-2xl"
-       style="border:1px solid ${h}55;">
+       style="border:1px solid ${h}55; --card-accent:${h};">
     <div class="h-1.5 w-full" style="background:linear-gradient(90deg, ${h}, ${h}55)"></div>
 
     <!-- header -->
@@ -649,23 +668,21 @@ function modalHtml(c: Card): string {
       <button id="m-delete" class="btn btn-ghost !py-1.5 !px-2.5 text-sm ml-auto hover:!text-rose-300">${ICON.trash} <span>Delete</span></button>
     </div>
 
-    <!-- body: single pane toggled by the Write / Preview switch -->
-    <div class="flex-1 min-h-0 px-4 sm:px-5 pt-4 pb-3 flex flex-col">
+    <!-- body: compact Write/Preview switch (top-left) + single pane -->
+    <div class="flex-1 min-h-0 px-4 sm:px-5 pt-3 pb-3 flex flex-col">
+      <div class="mb-2.5">
+        <div class="relative grid grid-cols-2 w-40 p-0.5 rounded-lg bg-ink-800 border border-ink-600 text-sm">
+          <span id="m-seg-slider" class="absolute top-0.5 left-0.5 bottom-0.5 w-[calc(50%-0.125rem)] rounded-md bg-ink-600 transition-transform duration-200 ease-out"></span>
+          <button id="seg-write" class="relative z-10 py-1 font-heading text-center text-white">Write</button>
+          <button id="seg-preview" class="relative z-10 py-1 font-heading text-center text-mist-300">Preview</button>
+        </div>
+      </div>
       <textarea id="m-content" spellcheck="false"
         class="flex-1 min-h-0 resize-none outline-none rounded-xl bg-black/30 border border-white/10 p-4 text-lg leading-relaxed break-words"
         placeholder="Type anything here. Paste a command or code snippet and toggle Code for syntax colours. URLs become clickable in the preview.">${esc(c.content)}</textarea>
       <div id="m-preview" class="hidden flex-1 min-h-0 overflow-auto rounded-xl bg-black/20 border border-white/10 p-4 text-lg break-words">${renderContent(c, { full: true })}</div>
     </div>
-
-    <!-- write / preview slide switch -->
-    <div class="flex items-center justify-center gap-3 border-t border-white/5 py-2.5">
-      <div class="relative grid grid-cols-2 w-60 p-1 rounded-xl bg-ink-800 border border-ink-600">
-        <span id="m-seg-slider" class="absolute top-1 left-1 bottom-1 w-[calc(50%-0.25rem)] rounded-lg bg-ink-600 transition-transform duration-200 ease-out"></span>
-        <button id="seg-write" class="relative z-10 py-1.5 font-heading text-base text-center text-white">Write</button>
-        <button id="seg-preview" class="relative z-10 py-1.5 font-heading text-base text-center text-mist-300">Preview</button>
-      </div>
-      <span class="text-xs text-mist-400 hidden sm:inline">Saved automatically</span>
-    </div>
+    <div class="px-5 py-1.5 text-xs text-mist-400 border-t border-white/5">Changes save automatically.</div>
   </div>`;
 }
 
@@ -712,7 +729,6 @@ function wireModal() {
 
   const titleEl = $('m-title') as HTMLInputElement;
   const contentEl = $('m-content') as HTMLTextAreaElement;
-  titleEl.focus();
 
   titleEl.addEventListener('input', scheduleSave);
 
@@ -737,6 +753,7 @@ function wireModal() {
       const h = hex(c.color);
       const panel = $('card-modal').querySelector('.modal-panel') as HTMLElement;
       panel.style.borderColor = `${h}55`;
+      panel.style.setProperty('--card-accent', h);
       (panel.querySelector('div') as HTMLElement).style.background = `linear-gradient(90deg, ${h}, ${h}55)`;
       (panel.querySelector('header span') as HTMLElement).style.background = h;
       (document.getElementById('m-title') as HTMLInputElement).style.borderColor = `${h}99`;
@@ -865,13 +882,13 @@ function openSearch() {
   root.classList.remove('hidden');
   root.innerHTML = `
     <div class="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade" data-close></div>
-    <div class="relative mx-auto mt-[12vh] w-[min(680px,92vw)] glass rounded-2xl shadow-2xl overflow-hidden animate-pop">
-      <div class="flex items-center gap-3 px-4 py-3 border-b border-white/5">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9a9aa6" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-        <input id="s-input" class="flex-1 bg-transparent outline-none text-xl" placeholder="Search boards, cards, commands, code…" autocomplete="off" />
-        <span class="text-xs text-mist-400 border border-white/10 rounded px-1.5 py-0.5">Esc</span>
+    <div class="relative mx-auto mt-[12vh] w-[min(640px,92vw)] glass rounded-[28px] shadow-2xl overflow-hidden animate-pop p-2.5">
+      <div class="flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-white/[0.04]">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9a9aa6" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="s-input" class="flex-1 bg-transparent outline-none text-xl placeholder:text-mist-400" placeholder="Search boards, cards, commands, code…" autocomplete="off" />
+        <span class="text-xs text-mist-400 border border-white/10 rounded-md px-2 py-1">Esc</span>
       </div>
-      <div id="s-results" class="max-h-[52vh] overflow-y-auto p-2"></div>
+      <div id="s-results" class="max-h-[54vh] overflow-y-auto mt-2 px-1 pb-1 space-y-1"></div>
     </div>`;
   root.querySelectorAll('[data-close]').forEach((el) => el.addEventListener('click', closeSearch));
   const input = $('s-input') as HTMLInputElement;
@@ -927,18 +944,18 @@ function renderSearchResults(query: string) {
     .map((r, i) => {
       const h = r.card ? hex(r.card.color) : '#7c5cff';
       const icon = r.type === 'board'
-        ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>`
-        : `<span class="w-3 h-3 rounded-full" style="background:${h}"></span>`;
+        ? `<span class="w-7 h-7 rounded-lg grid place-items-center bg-white/5 text-mist-300"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></span>`
+        : `<span class="w-7 h-7 rounded-lg grid place-items-center" style="background:${h}26"><span class="w-2.5 h-2.5 rounded-full" style="background:${h}"></span></span>`;
       const snippet = r.card && r.card.content
         ? `<div class="text-mist-400 text-xs truncate mt-0.5">${highlightMatch(r.card.content.replace(/\s+/g, ' ').slice(0, 90), query)}</div>` : '';
-      return `<button class="s-item w-full text-left flex items-start gap-3 px-3 py-2.5 rounded-xl ${i === searchIndex ? 'bg-ink-600' : 'hover:bg-white/5'}" data-idx="${i}">
-        <span class="mt-1 shrink-0 text-mist-300">${icon}</span>
+      return `<button class="s-item w-full text-left flex items-center gap-3 px-3 py-3 rounded-2xl ${i === searchIndex ? 'bg-white/10 s-active' : 'hover:bg-white/5'}" data-idx="${i}">
+        <span class="shrink-0">${icon}</span>
         <span class="min-w-0 flex-1">
           <span class="block truncate text-base text-mist-100">${highlightMatch(r.label, query)}</span>
           <span class="block truncate text-xs text-mist-400">${esc(r.sub)}</span>
           ${snippet}
         </span>
-        <span class="text-[10px] text-mist-400 mt-1 shrink-0 uppercase tracking-wide">${r.type}</span>
+        <span class="text-[10px] text-mist-400 shrink-0 uppercase tracking-wide">${r.type}</span>
       </button>`;
     })
     .join('');
@@ -1060,7 +1077,7 @@ function wireGlobal() {
 }
 
 function scrollActive() {
-  document.querySelector('.s-item.bg-ink-600')?.scrollIntoView({ block: 'nearest' });
+  document.querySelector('.s-item.s-active')?.scrollIntoView({ block: 'nearest' });
 }
 
 async function editCardName(id: string) {
