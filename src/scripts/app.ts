@@ -589,6 +589,47 @@ function closePopovers() {
   document.querySelectorAll('.popover').forEach((p) => p.remove());
 }
 
+// iOS-style custom font dropdown (each option in its own font; width matches the button)
+function openFontMenu(cardId: string, anchor: HTMLElement) {
+  closePopovers();
+  const found = findCard(cardId);
+  if (!found) return;
+  const c = found.card;
+  const check = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="color:var(--card-accent,#f97316)"><path d="M20 6 9 17l-5-5"/></svg>';
+  const pop = document.createElement('div');
+  pop.className = 'popover font-menu glass rounded-2xl p-1.5 shadow-2xl animate-pop';
+  pop.style.position = 'fixed';
+  pop.style.zIndex = '90';
+  pop.style.maxHeight = '56vh';
+  pop.style.overflowY = 'auto';
+  pop.innerHTML = FONTS.map(
+    (f) => `<button class="font-opt w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-left ${f === fontOf(c) ? 'bg-white/10' : 'hover:bg-white/5'}" data-font="${esc(f)}">
+      <span class="truncate text-base" style="font-family:'${f}'">${esc(f)}</span>
+      ${f === fontOf(c) ? check : ''}
+    </button>`
+  ).join('');
+  document.body.appendChild(pop);
+
+  const r = anchor.getBoundingClientRect();
+  pop.style.width = `${Math.round(r.width)}px`; // match the button width
+  pop.style.top = `${Math.min(r.bottom + 6, window.innerHeight - pop.offsetHeight - 10)}px`;
+  pop.style.left = `${Math.min(r.left, window.innerWidth - pop.offsetWidth - 10)}px`;
+
+  pop.querySelectorAll<HTMLElement>('.font-opt').forEach((el) =>
+    el.addEventListener('click', () => {
+      const f = el.dataset.font!;
+      c.font = f;
+      const lbl = document.getElementById('m-font-label');
+      if (lbl) { lbl.textContent = f; lbl.style.fontFamily = `'${f}'`; }
+      const ta = document.getElementById('m-content') as HTMLTextAreaElement | null;
+      if (ta) ta.style.fontFamily = `'${f}'`;
+      updatePreview();
+      patchCard(c.id, { font: f });
+      closePopovers();
+    })
+  );
+}
+
 /* ============================= MODAL =============================== */
 let modalCardId: string | null = null;
 let saveTimer: number | undefined;
@@ -607,6 +648,7 @@ function setModalView(mode: 'write' | 'preview') {
     pv.classList.remove('hidden');
     ta.classList.add('hidden');
     slider.style.transform = 'translateX(100%)';
+    animatePreview();
   } else {
     ta.classList.remove('hidden');
     pv.classList.add('hidden');
@@ -673,14 +715,15 @@ function modalHtml(c: Card): string {
     <div class="flex flex-wrap items-center gap-2 px-5 py-2.5 border-b border-white/5 text-sm">
       <div class="flex items-center gap-1.5">${colorSwatches(c.color)}</div>
       <span class="w-px h-6 bg-white/10 mx-1"></span>
-      <button id="m-code" title="Toggle between code and plain text" class="btn btn-ghost !py-1.5 !px-2.5 text-sm min-w-[6rem]"><span id="m-code-icon">${c.isCode ? ICON.text : ICON.code}</span> <span id="m-code-label">${c.isCode ? 'Text' : 'Code'}</span></button>
-      <select id="m-font" class="field !w-40 !py-1.5 !px-2 text-sm truncate" title="Card font">
-        ${FONTS.map((f) => `<option value="${esc(f)}" ${f === fontOf(c) ? 'selected' : ''} style="font-family:'${f}'">${esc(f)}</option>`).join('')}
-      </select>
-      <span class="w-px h-6 bg-white/10 mx-1"></span>
-      <button id="m-pin" class="btn btn-ghost !py-1.5 !px-2.5 text-sm min-w-[6.5rem] ${c.pinned ? '!border-accent/40' : ''}" style="${c.pinned ? `color:${h}` : ''}">${ICON.pin} <span>${c.pinned ? 'Pinned' : 'Pin'}</span></button>
-      <button id="m-fav" class="btn btn-ghost !py-1.5 !px-2.5 text-sm min-w-[6.75rem]" style="${c.favorite ? 'color:#fbbf24' : ''}">${c.favorite ? ICON.starFill : ICON.star} <span>${c.favorite ? 'Starred' : 'Star'}</span></button>
-      <button id="m-delete" class="btn !py-1.5 !px-2.5 text-sm ml-auto text-rose-400 border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20">${ICON.trash} <span>Delete</span></button>
+      <button id="m-code" title="Toggle between code and plain text" class="btn btn-ghost !py-1.5 !px-2.5 text-sm min-w-0 sm:min-w-[6rem]"><span id="m-code-icon">${c.isCode ? ICON.text : ICON.code}</span> <span id="m-code-label" class="hidden sm:inline">${c.isCode ? 'Text' : 'Code'}</span></button>
+      <button id="m-font-btn" type="button" title="Card font" class="field !w-28 sm:!w-44 !py-1.5 !px-2.5 text-sm flex items-center justify-between gap-1.5">
+        <span id="m-font-label" class="truncate" style="font-family:'${esc(fontOf(c))}'">${esc(fontOf(c))}</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 text-mist-400"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <span class="w-px h-6 bg-white/10 mx-1 hidden sm:block"></span>
+      <button id="m-pin" class="btn btn-ghost !py-1.5 !px-2.5 text-sm min-w-0 sm:min-w-[6.5rem] ${c.pinned ? '!border-accent/40' : ''}" style="${c.pinned ? `color:${h}` : ''}">${ICON.pin} <span class="hidden sm:inline">${c.pinned ? 'Pinned' : 'Pin'}</span></button>
+      <button id="m-fav" class="btn btn-ghost !py-1.5 !px-2.5 text-sm min-w-0 sm:min-w-[6.75rem]" style="${c.favorite ? 'color:#fbbf24' : ''}">${c.favorite ? ICON.starFill : ICON.star} <span class="hidden sm:inline">${c.favorite ? 'Starred' : 'Star'}</span></button>
+      <button id="m-delete" class="btn !py-1.5 !px-2.5 text-sm ml-auto text-rose-400 border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20">${ICON.trash} <span class="hidden sm:inline">Delete</span></button>
     </div>
 
     <!-- body: compact Write/Preview switch (top-left) + single pane -->
@@ -709,6 +752,15 @@ function updatePreview() {
   const c = currentModalCard();
   if (!c) return;
   $('m-preview').innerHTML = renderContent(c, { full: true });
+}
+
+// replay a quick swap animation on the preview (used when toggling code/text)
+function animatePreview() {
+  const pv = document.getElementById('m-preview');
+  if (!pv) return;
+  pv.classList.remove('preview-swap');
+  void pv.offsetWidth; // force reflow so the animation restarts
+  pv.classList.add('preview-swap');
 }
 
 function refreshModalChrome() {
@@ -777,7 +829,7 @@ function wireModal() {
   );
 
   const codeBtn = $('m-code');
-  const fontSel = $('m-font') as HTMLSelectElement;
+  const fontBtn = $('m-font-btn');
   function syncCodeUi() {
     // The button is a toggle: label shows what clicking will switch the card TO.
     const iconEl = document.getElementById('m-code-icon');
@@ -790,22 +842,21 @@ function wireModal() {
     if (c.isCode && c.language === 'plaintext') c.language = detectLanguage(c.content) || 'plaintext';
     syncCodeUi();
     updatePreview();
+    if (modalView === 'preview') animatePreview();
     patchCard(c.id, { isCode: c.isCode, language: c.language });
   });
-  // font selector — applies to the card's text (code stays monospace)
-  fontSel.addEventListener('change', () => {
-    c.font = fontSel.value;
-    const ta = document.getElementById('m-content') as HTMLTextAreaElement | null;
-    if (ta) ta.style.fontFamily = `'${c.font}'`;
-    updatePreview();
-    patchCard(c.id, { font: c.font });
+  // font selector — iOS-style dropdown (applies to the card's text; code stays monospace)
+  fontBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (document.querySelector('.font-menu')) closePopovers();
+    else openFontMenu(c.id, fontBtn);
   });
 
   // Update pin/favourite in place (rebuilding the modal would flash the backdrop blur).
   $('m-pin').addEventListener('click', async () => {
     c.pinned = !c.pinned;
     const btn = $('m-pin');
-    btn.innerHTML = `${ICON.pin} <span>${c.pinned ? 'Pinned' : 'Pin'}</span>`;
+    btn.innerHTML = `${ICON.pin} <span class="hidden sm:inline">${c.pinned ? 'Pinned' : 'Pin'}</span>`;
     btn.style.color = c.pinned ? hex(c.color) : '';
     btn.classList.toggle('!border-accent/40', c.pinned);
     await patchCard(c.id, { pinned: c.pinned });
@@ -813,7 +864,7 @@ function wireModal() {
   $('m-fav').addEventListener('click', async () => {
     c.favorite = !c.favorite;
     const btn = $('m-fav');
-    btn.innerHTML = `${c.favorite ? ICON.starFill : ICON.star} <span>${c.favorite ? 'Starred' : 'Star'}</span>`;
+    btn.innerHTML = `${c.favorite ? ICON.starFill : ICON.star} <span class="hidden sm:inline">${c.favorite ? 'Starred' : 'Star'}</span>`;
     btn.style.color = c.favorite ? '#fbbf24' : '';
     await patchCard(c.id, { favorite: c.favorite });
   });

@@ -254,6 +254,13 @@ select:focus, select:focus-visible {
 .animate-fade { animation: fade-in 0.2s ease both; }
 .animate-rise { animation: rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
+/* preview content swap (when toggling code/text in the preview tab) */
+@keyframes preview-swap {
+  0% { opacity: 0; transform: translateY(10px) scale(0.985); filter: blur(4px); }
+  100% { opacity: 1; transform: none; filter: blur(0); }
+}
+.preview-swap { animation: preview-swap 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
 /* ----------------------------------------------------------------------------
    Intro splash — logo appears centred, glides left while the title slides out
    of it to the right, then the whole overlay fades away to reveal the page.
@@ -334,8 +341,8 @@ select:focus, select:focus-visible {
   font-size: 0.92rem;
   line-height: 1.6;
   letter-spacing: 0;
-  background: #1e1e1e;
-  color: #d4d4d4;
+  background: #272822;
+  color: #f8f8f2;
   border-radius: 0.7rem;
   border: 1px solid rgba(255, 255, 255, 0.07);
   tab-size: 2;
@@ -343,26 +350,27 @@ select:focus, select:focus-visible {
   word-break: break-word;
   overflow-wrap: anywhere;
 }
-.code-block .tok-keyword   { color: #569cd6; }
-.code-block .tok-control   { color: #c586c0; }
-.code-block .tok-string    { color: #ce9178; }
-.code-block .tok-number    { color: #b5cea8; }
-.code-block .tok-comment   { color: #6a9955; font-style: italic; }
-.code-block .tok-function  { color: #dcdcaa; }
-.code-block .tok-type      { color: #4ec9b0; }
-.code-block .tok-builtin   { color: #4fc1ff; }
-.code-block .tok-property  { color: #9cdcfe; }
-.code-block .tok-operator  { color: #d4d4d4; }
-.code-block .tok-punct     { color: #d4d4d4; }
-.code-block .tok-tag       { color: #569cd6; }
-.code-block .tok-attr      { color: #9cdcfe; }
-.code-block .tok-regex     { color: #d16969; }
+/* Monokai theme */
+.code-block .tok-keyword   { color: #f92672; }
+.code-block .tok-control   { color: #f92672; }
+.code-block .tok-string    { color: #e6db74; }
+.code-block .tok-number    { color: #ae81ff; }
+.code-block .tok-comment   { color: #75715e; font-style: italic; }
+.code-block .tok-function  { color: #a6e22e; }
+.code-block .tok-type      { color: #66d9ef; font-style: italic; }
+.code-block .tok-builtin   { color: #66d9ef; }
+.code-block .tok-property  { color: #f8f8f2; }
+.code-block .tok-operator  { color: #f92672; }
+.code-block .tok-punct     { color: #f8f8f2; }
+.code-block .tok-tag       { color: #f92672; }
+.code-block .tok-attr      { color: #a6e22e; }
+.code-block .tok-regex     { color: #e6db74; }
 
 /* links inside card content */
 .rich-content a {
-  color: var(--color-accent-soft);
+  color: #4ea3ff;
   text-decoration: underline;
   text-underline-offset: 2px;
   word-break: break-word;
 }
-.rich-content a:hover { color: #ffd27a; }
+.rich-content a:hover { color: #7dbbff; }
