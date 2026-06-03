@@ -1257,8 +1257,44 @@ function initAssistant() {
   if (!root || !convo) return;
 
   const setFace = (f: 'happy' | 'sad' | 'angry' | 'mad') => { root.dataset.face = f; };
+
+  // pick the most natural English voice the browser offers (neural/online > google > others)
+  let aiVoice: SpeechSynthesisVoice | null = null;
+  function pickVoice() {
+    let voices: SpeechSynthesisVoice[] = [];
+    try { voices = speechSynthesis.getVoices(); } catch { return; }
+    if (!voices.length) return;
+    const en = voices.filter((v) => /^en[-_]?/i.test(v.lang));
+    const pool = en.length ? en : voices;
+    const score = (v: SpeechSynthesisVoice) => {
+      const n = v.name.toLowerCase();
+      let s = 0;
+      if (n.includes('natural')) s += 120;        // Edge neural ("… Online (Natural)")
+      if (n.includes('online')) s += 80;
+      if (n.includes('google')) s += 70;          // Chrome
+      if (/\b(aria|jenny|emma|ava|libby|sonia|ryan|guy|andrew|brian)\b/.test(n)) s += 45;
+      if (v.localService === false) s += 25;       // cloud voices are usually nicer
+      if (/zira|david|mark|hazel|susan/.test(n)) s += 10;
+      if (v.lang.toLowerCase() === 'en-us') s += 8;
+      if (/microsoft|google|apple|samantha/.test(n)) s += 5;
+      return s;
+    };
+    aiVoice = pool.slice().sort((a, b) => score(b) - score(a))[0] || null;
+  }
+  pickVoice();
+  try { speechSynthesis.addEventListener('voiceschanged', pickVoice); } catch {}
+
   const speak = (t: string) => {
-    try { const u = new SpeechSynthesisUtterance(t); u.rate = 1.06; u.pitch = 1.05; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch {}
+    try {
+      if (!aiVoice) pickVoice();
+      const u = new SpeechSynthesisUtterance(t);
+      if (aiVoice) { u.voice = aiVoice; u.lang = aiVoice.lang; }
+      u.rate = 1.0;
+      u.pitch = 1.0;
+      u.volume = 1;
+      speechSynthesis.cancel();
+      speechSynthesis.speak(u);
+    } catch {}
   };
   const addLine = (who: 'you' | 'ai', text: string) => {
     const el = document.createElement('div');
