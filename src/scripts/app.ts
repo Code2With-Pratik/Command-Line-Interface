@@ -655,7 +655,7 @@ function modalHtml(c: Card): string {
   <div class="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade" data-close></div>
   <div class="modal-panel relative mx-auto my-[3vh] h-[94vh] w-[min(1000px,94vw)] flex flex-col rounded-3xl overflow-hidden glass shadow-2xl"
        style="border:1px solid ${h}55; --card-accent:${h};">
-    <div class="h-1.5 w-full" style="background:linear-gradient(90deg, ${h}, ${h}55)"></div>
+    <div class="h-1.5 w-full" style="background:${h}"></div>
 
     <!-- header -->
     <header class="flex items-center gap-3 px-5 py-3 border-b border-white/5">
@@ -769,7 +769,7 @@ function wireModal() {
       const panel = $('card-modal').querySelector('.modal-panel') as HTMLElement;
       panel.style.borderColor = `${h}55`;
       panel.style.setProperty('--card-accent', h);
-      (panel.querySelector('div') as HTMLElement).style.background = `linear-gradient(90deg, ${h}, ${h}55)`;
+      (panel.querySelector('div') as HTMLElement).style.background = h;
       (panel.querySelector('header span') as HTMLElement).style.background = h;
       (document.getElementById('m-title') as HTMLInputElement).style.borderColor = `${h}99`;
       await patchCard(c.id, { color: c.color });
