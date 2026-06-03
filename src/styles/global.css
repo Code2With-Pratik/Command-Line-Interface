@@ -5,7 +5,7 @@
 ---------------------------------------------------------------------------- */
 @theme {
   --font-heading: "Merienda", cursive;
-  --font-body: "Indie Flower", cursive;
+  --font-body: "DM Sans", system-ui, sans-serif;
 
   /* dark surface scale */
   --color-ink-950: #050505;

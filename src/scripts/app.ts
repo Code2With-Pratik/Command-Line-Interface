@@ -9,6 +9,7 @@ interface Card {
   color: string;
   isCode: boolean;
   language: Language;
+  font: string;
   pinned: boolean;
   favorite: boolean;
   position: number;
@@ -31,6 +32,13 @@ const PALETTE: Record<string, { hex: string }> = {
 };
 const COLOR_NAMES = Object.keys(PALETTE);
 const hex = (c: string) => PALETTE[c]?.hex ?? PALETTE.violet.hex;
+
+// Per-card fonts (alphabetical). Values are real Google font-family names.
+const FONTS = [
+  'Arima', 'Arimo', 'Caveat', 'Dancing Script', 'DM Sans', 'Indie Flower',
+  'Merienda', 'Playwrite AU VIC Guides', 'Playwrite GB J', 'Poppins', 'Source Serif 4',
+];
+const fontOf = (c: Card) => (FONTS.includes(c.font) ? c.font : 'DM Sans');
 
 /* ============================== state ============================== */
 const state = {
@@ -226,7 +234,7 @@ function renderContent(card: Card, opts: { full?: boolean } = {}): string {
   if (card.isCode) {
     return `<pre class="code-block ${opts.full ? 'p-4' : 'p-3'} overflow-auto"><code>${highlight(card.content, card.language)}</code></pre>`;
   }
-  return `<div class="rich-content whitespace-pre-wrap break-words leading-relaxed">${linkify(card.content)}</div>`;
+  return `<div class="rich-content whitespace-pre-wrap break-words leading-relaxed" style="font-family:'${esc(fontOf(card))}'">${linkify(card.content)}</div>`;
 }
 
 /* ============================ accessors ============================ */
@@ -666,13 +674,13 @@ function modalHtml(c: Card): string {
       <div class="flex items-center gap-1.5">${colorSwatches(c.color)}</div>
       <span class="w-px h-6 bg-white/10 mx-1"></span>
       <button id="m-code" title="Toggle between code and plain text" class="btn btn-ghost !py-1.5 !px-2.5 text-sm"><span id="m-code-icon">${c.isCode ? ICON.text : ICON.code}</span> <span id="m-code-label">${c.isCode ? 'Text' : 'Code'}</span></button>
-      <select id="m-lang" class="field !w-auto !py-1.5 !px-2 text-sm ${c.isCode ? '' : 'hidden'}">
-        ${LANGUAGES.map((l) => `<option value="${l}" ${l === c.language ? 'selected' : ''}>${l}</option>`).join('')}
+      <select id="m-font" class="field !w-auto !py-1.5 !px-2 text-sm" title="Card font">
+        ${FONTS.map((f) => `<option value="${esc(f)}" ${f === fontOf(c) ? 'selected' : ''} style="font-family:'${f}'">${esc(f)}</option>`).join('')}
       </select>
       <span class="w-px h-6 bg-white/10 mx-1"></span>
       <button id="m-pin" class="btn btn-ghost !py-1.5 !px-2.5 text-sm ${c.pinned ? '!border-accent/40' : ''}" style="${c.pinned ? `color:${h}` : ''}">${ICON.pin} <span>${c.pinned ? 'Pinned' : 'Pin'}</span></button>
       <button id="m-fav" class="btn btn-ghost !py-1.5 !px-2.5 text-sm" style="${c.favorite ? 'color:#fbbf24' : ''}">${c.favorite ? ICON.starFill : ICON.star} <span>${c.favorite ? 'Starred' : 'Star'}</span></button>
-      <button id="m-delete" class="btn btn-ghost !py-1.5 !px-2.5 text-sm ml-auto hover:!text-rose-300">${ICON.trash} <span>Delete</span></button>
+      <button id="m-delete" class="btn !py-1.5 !px-2.5 text-sm ml-auto text-rose-400 border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20">${ICON.trash} <span>Delete</span></button>
     </div>
 
     <!-- body: compact Write/Preview switch (top-left) + single pane -->
@@ -684,7 +692,7 @@ function modalHtml(c: Card): string {
           <button id="seg-preview" class="relative z-10 py-1 font-heading text-center text-mist-300">Preview</button>
         </div>
       </div>
-      <textarea id="m-content" spellcheck="false"
+      <textarea id="m-content" spellcheck="false" style="font-family:'${esc(fontOf(c))}'"
         class="flex-1 min-h-0 resize-none outline-none rounded-xl bg-black/30 border border-white/10 p-4 text-lg leading-relaxed break-words"
         placeholder="Type anything here. Paste a command or code snippet and toggle Code for syntax colours. URLs become clickable in the preview.">${esc(c.content)}</textarea>
       <div id="m-preview" class="hidden flex-1 min-h-0 overflow-auto rounded-xl bg-black/20 border border-white/10 p-4 text-lg break-words">${renderContent(c, { full: true })}</div>
@@ -769,15 +777,13 @@ function wireModal() {
   );
 
   const codeBtn = $('m-code');
-  const langSel = $('m-lang') as HTMLSelectElement;
+  const fontSel = $('m-font') as HTMLSelectElement;
   function syncCodeUi() {
     // The button is a toggle: label shows what clicking will switch the card TO.
     const iconEl = document.getElementById('m-code-icon');
     const labelEl = document.getElementById('m-code-label');
     if (iconEl) iconEl.innerHTML = c.isCode ? ICON.text : ICON.code;
     if (labelEl) labelEl.textContent = c.isCode ? 'Text' : 'Code';
-    langSel.classList.toggle('hidden', !c.isCode);
-    langSel.value = c.language;
   }
   codeBtn.addEventListener('click', () => {
     c.isCode = !c.isCode;
@@ -786,10 +792,13 @@ function wireModal() {
     updatePreview();
     patchCard(c.id, { isCode: c.isCode, language: c.language });
   });
-  langSel.addEventListener('change', () => {
-    c.language = langSel.value as Language;
+  // font selector — applies to the card's text (code stays monospace)
+  fontSel.addEventListener('change', () => {
+    c.font = fontSel.value;
+    const ta = document.getElementById('m-content') as HTMLTextAreaElement | null;
+    if (ta) ta.style.fontFamily = `'${c.font}'`;
     updatePreview();
-    patchCard(c.id, { language: c.language });
+    patchCard(c.id, { font: c.font });
   });
 
   // Update pin/favourite in place (rebuilding the modal would flash the backdrop blur).

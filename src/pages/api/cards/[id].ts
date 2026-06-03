@@ -5,6 +5,7 @@ import { json, error, handle } from '../../../lib/http';
 export const prerender = false;
 
 const COLORS = ['violet', 'rose', 'amber', 'emerald', 'sky', 'fuchsia', 'lime', 'orange', 'cyan', 'indigo'];
+const FONTS = ['Arima', 'Arimo', 'Caveat', 'Dancing Script', 'DM Sans', 'Indie Flower', 'Merienda', 'Playwrite AU VIC Guides', 'Playwrite GB J', 'Poppins', 'Source Serif 4'];
 
 async function ownCard(userId: string, id: string) {
   const card = await prisma.card.findUnique({ where: { id }, include: { board: true } });
@@ -32,6 +33,7 @@ export const PATCH = handle(async ({ params, request, cookies }) => {
   if (typeof body.color === 'string' && COLORS.includes(body.color)) data.color = body.color;
   if (typeof body.isCode === 'boolean') data.isCode = body.isCode;
   if (typeof body.language === 'string') data.language = body.language;
+  if (typeof body.font === 'string' && FONTS.includes(body.font)) data.font = body.font;
   if (typeof body.pinned === 'boolean') data.pinned = body.pinned;
   if (typeof body.favorite === 'boolean') data.favorite = body.favorite;
 

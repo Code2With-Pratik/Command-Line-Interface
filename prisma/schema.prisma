@@ -52,6 +52,7 @@ model Card {
   color     String   @default("violet")
   isCode    Boolean  @default(false)
   language  String   @default("plaintext")
+  font      String   @default("DM Sans")
   pinned    Boolean  @default(false)
   favorite  Boolean  @default(false)
   position  Int      @default(0)
