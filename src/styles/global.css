@@ -227,6 +227,13 @@ select:focus, select:focus-visible {
     opacity: 0.96;
   }
   .card-tile.card-dragging { opacity: 0.3; }
+  /* while dragging, give every tile one consistent transition and kill the hover lift
+     so they glide to make space instead of glitching */
+  #card-grid.is-dragging .card-tile {
+    transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+  }
+  #card-grid.is-dragging .card-tile:hover { transform: none; }
   .drag-placeholder {
     border: 2px dashed var(--color-accent);
     background: rgba(249, 115, 22, 0.08);
@@ -447,6 +454,39 @@ select:focus, select:focus-visible {
 .code-block .tok-tag       { color: #f92672; }
 .code-block .tok-attr      { color: #a6e22e; }
 .code-block .tok-regex     { color: #e6db74; }
+
+/* contenteditable placeholder + code mode */
+#m-content[contenteditable]:empty::before {
+  content: attr(data-ph);
+  color: var(--color-mist-400);
+  pointer-events: none;
+}
+#m-content.code-mode {
+  font-family: "SFMono-Regular", ui-monospace, "JetBrains Mono", Consolas, monospace !important;
+  white-space: pre;
+}
+
+/* rich-text selection toolbar */
+#fmt-bar .fmt-btn {
+  width: 1.95rem;
+  height: 1.95rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  color: var(--color-mist-100);
+  font-size: 1rem;
+}
+#fmt-bar .fmt-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.fmt-color-sw {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 0.4rem;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.fmt-color-sw:hover { transform: scale(1.12); }
 
 /* links inside card content */
 .rich-content a {

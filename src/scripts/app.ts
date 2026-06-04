@@ -58,6 +58,7 @@ let dragState: {
   ghost: HTMLElement | null; ph: HTMLElement | null; overTab: string | null;
 } | null = null;
 let dragSuppressClick = false;
+let suppressRise = false; // skip the card fade-in animation on drag/drop re-renders
 
 function onCardDragMove(e: PointerEvent) {
   if (!dragState) return;
@@ -90,6 +91,7 @@ function onCardDragMove(e: PointerEvent) {
     st.ph = ph;
     inner.insertBefore(ph, inner.querySelector(`.card-tile[data-card="${st.ids[0]}"]`));
     st.ids.forEach((id) => inner.querySelector(`.card-tile[data-card="${id}"]`)?.remove());
+    document.getElementById('card-grid')?.classList.add('is-dragging');
     document.body.style.cursor = 'grabbing';
     st.started = true;
   }
@@ -122,12 +124,13 @@ function onCardDragUp() {
   dragState = null;
   if (!st.started) return;
   document.body.style.cursor = '';
+  document.getElementById('card-grid')?.classList.remove('is-dragging');
   st.ghost?.remove();
   document.querySelectorAll('.tab-row.tab-drop').forEach((x) => x.classList.remove('tab-drop'));
   dragSuppressClick = true;
   setTimeout(() => { dragSuppressClick = false; }, 60);
 
-  if (st.overTab) { st.ph?.remove(); moveCardsToBoard(st.ids, st.overTab); return; }
+  if (st.overTab) { st.ph?.remove(); suppressRise = true; moveCardsToBoard(st.ids, st.overTab); suppressRise = false; return; }
 
   const inner = gridInner();
   let index = 0;
@@ -143,7 +146,9 @@ function onCardDragUp() {
     const c = board.cards.find((x) => x.id === id);
     if (c) { if (c.position !== i) changed.push(id); c.position = i; }
   });
+  suppressRise = true;
   renderBoard();
+  suppressRise = false;
   changed.forEach((id) => {
     const c = board.cards.find((x) => x.id === id);
     if (c) patchCard(id, { position: c.position });
@@ -325,15 +330,32 @@ function linkify(text: string): string {
   return esc(text).replace(URL_RE, (u) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`);
 }
 
-// Renders card content: highlighted code block, or prose with clickable links.
+/* ---- rich content helpers (content may be HTML from the editor) ---------- */
+const stripTags = (s: string) => s.replace(/<[^>]+>/g, ' ');
+const looksLikeHtml = (s: string) => /<\/?[a-z][\s\S]*>/i.test(s);
+const textToHtml = (s: string) => esc(s).replace(/\n/g, '<br>'); // plain → editable html
+function htmlToPlain(html: string): string {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(div|p|li|h[1-6])>/gi, '\n');
+  return (tmp.textContent || '').replace(/ /g, ' ').replace(/\n{3,}/g, '\n\n').replace(/[ \t]+\n/g, '\n').trim();
+}
+// linkify URLs only in the text segments of an HTML string (leaves tags/attrs alone)
+function linkifyHtml(html: string): string {
+  return html.replace(/(<[^>]+>)|([^<]+)/g, (_m, tag: string, txt: string) =>
+    tag ? tag : txt.replace(URL_RE, (u) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`));
+}
+
+// Renders card content: highlighted code block, or rich prose with clickable links.
 function renderContent(card: Card, opts: { full?: boolean } = {}): string {
-  if (!card.content.trim()) {
-    return `<span class="text-mist-400 italic">${opts.full ? 'Empty — click edit to add content.' : 'No content yet…'}</span>`;
+  const plain = htmlToPlain(card.content);
+  if (!plain.trim()) {
+    return `<span class="text-mist-400 italic">${opts.full ? 'Empty — start typing in the Write tab.' : 'No content yet…'}</span>`;
   }
   if (card.isCode) {
-    return `<pre class="code-block ${opts.full ? 'p-4' : 'p-3'} overflow-auto"><code>${highlight(card.content, card.language)}</code></pre>`;
+    return `<pre class="code-block ${opts.full ? 'p-4' : 'p-3'} overflow-auto"><code>${highlight(plain, card.language)}</code></pre>`;
   }
-  return `<div class="rich-content whitespace-pre-wrap break-words leading-relaxed" style="font-family:'${esc(fontOf(card))}'">${linkify(card.content)}</div>`;
+  const inner = looksLikeHtml(card.content) ? linkifyHtml(card.content) : linkify(card.content);
+  return `<div class="rich-content whitespace-pre-wrap break-words leading-relaxed" style="font-family:'${esc(fontOf(card))}'">${inner}</div>`;
 }
 
 /* ============================ accessors ============================ */
@@ -426,7 +448,7 @@ function renderBoard() {
 function cardHtml(c: Card): string {
   const h = hex(c.color);
   // Coloured border on a dark surface (not a fully coloured card).
-  return `<article class="card-tile group relative rounded-2xl p-4 h-[210px] cursor-grab active:cursor-grabbing animate-rise overflow-hidden flex flex-col ${selectedCardIds.has(c.id) ? 'is-selected' : ''}"
+  return `<article class="card-tile group relative rounded-2xl p-4 h-[210px] cursor-grab active:cursor-grabbing overflow-hidden flex flex-col ${suppressRise ? '' : 'animate-rise'} ${selectedCardIds.has(c.id) ? 'is-selected' : ''}"
       data-card="${c.id}"
       style="background:linear-gradient(160deg, ${h}14, rgba(15,15,17,.92));border:1.5px solid ${h}80;box-shadow:0 12px 30px -18px ${h}, inset 0 1px 0 ${h}1f;">
     <span class="absolute left-0 top-0 h-full w-1" style="background:${h}"></span>
@@ -891,9 +913,9 @@ function modalHtml(c: Card): string {
           <button id="seg-preview" class="relative z-10 py-1 font-heading text-center text-mist-300">Preview</button>
         </div>
       </div>
-      <textarea id="m-content" spellcheck="false" style="font-family:'${esc(fontOf(c))}'"
-        class="flex-1 min-h-0 resize-none outline-none rounded-xl bg-black/30 border border-white/10 p-4 text-lg leading-relaxed break-words"
-        placeholder="Type anything here. Paste a command or code snippet and toggle Code for syntax colours. URLs become clickable in the preview.">${esc(c.content)}</textarea>
+      <div id="m-content" contenteditable="true" spellcheck="false" style="font-family:'${esc(fontOf(c))}'"
+        data-ph="Type anything here. Select text to format it; paste a command and toggle Code."
+        class="flex-1 min-h-0 overflow-auto outline-none rounded-xl bg-black/30 border border-white/10 p-4 text-lg leading-relaxed break-words rich-content whitespace-pre-wrap"></div>
       <div id="m-preview" class="hidden flex-1 min-h-0 overflow-auto rounded-xl bg-black/20 border border-white/10 p-4 text-lg break-words">${renderContent(c, { full: true })}</div>
     </div>
     <div class="px-5 py-1.5 text-xs text-mist-400 border-t border-white/5">Changes save automatically.</div>
@@ -978,10 +1000,10 @@ function flushSave() {
   const c = currentModalCard();
   if (!c) return;
   const titleEl = document.getElementById('m-title') as HTMLInputElement | null;
-  const contentEl = document.getElementById('m-content') as HTMLTextAreaElement | null;
+  const contentEl = document.getElementById('m-content') as HTMLElement | null;
   if (!titleEl || !contentEl) return;
   const title = titleEl.value.trim() || 'Untitled';
-  const content = contentEl.value;
+  const content = contentEl.innerHTML;
   patchCard(c.id, { title, content, isCode: c.isCode, language: c.language });
 }
 
@@ -990,16 +1012,20 @@ function wireModal() {
   if (!c) return;
 
   const titleEl = $('m-title') as HTMLInputElement;
-  const contentEl = $('m-content') as HTMLTextAreaElement;
+  const contentEl = $('m-content') as HTMLElement;
+  // load existing content (HTML from the editor, or legacy plain text)
+  contentEl.innerHTML = looksLikeHtml(c.content) ? c.content : textToHtml(c.content);
+  contentEl.classList.toggle('code-mode', c.isCode);
 
   titleEl.addEventListener('input', scheduleSave);
 
   contentEl.addEventListener('input', () => {
-    c.content = contentEl.value;
+    c.content = contentEl.innerHTML;
+    const plain = htmlToPlain(c.content);
     // auto-detect code on the fly (only flips ON automatically)
-    if (!c.isCode && looksLikeCode(contentEl.value)) {
+    if (!c.isCode && looksLikeCode(plain)) {
       c.isCode = true;
-      c.language = detectLanguage(contentEl.value);
+      c.language = detectLanguage(plain);
       syncCodeUi();
     }
     updatePreview();
@@ -1031,10 +1057,11 @@ function wireModal() {
     const labelEl = document.getElementById('m-code-label');
     if (iconEl) iconEl.innerHTML = c.isCode ? ICON.text : ICON.code;
     if (labelEl) labelEl.textContent = c.isCode ? 'Text' : 'Code';
+    document.getElementById('m-content')?.classList.toggle('code-mode', c.isCode);
   }
   codeBtn.addEventListener('click', () => {
     c.isCode = !c.isCode;
-    if (c.isCode && c.language === 'plaintext') c.language = detectLanguage(c.content) || 'plaintext';
+    if (c.isCode && c.language === 'plaintext') c.language = detectLanguage(htmlToPlain(c.content)) || 'plaintext';
     syncCodeUi();
     if (modalView === 'preview') typewritePreview();
     else updatePreview();
@@ -1080,22 +1107,6 @@ function wireModal() {
   $('card-modal').querySelectorAll('[data-close]').forEach((el) =>
     el.addEventListener('click', closeModal)
   );
-}
-
-// some toggles benefit from a light re-render of the toolbar labels
-function reopenModalPreserve() {
-  const c = currentModalCard();
-  if (!c) return;
-  const contentEl = document.getElementById('m-content') as HTMLTextAreaElement | null;
-  const titleEl = document.getElementById('m-title') as HTMLInputElement | null;
-  const scroll = (document.getElementById('m-content') as HTMLElement)?.scrollTop ?? 0;
-  const caret = contentEl?.selectionStart ?? 0;
-  const root = $('card-modal');
-  root.innerHTML = modalHtml(c);
-  root.querySelector('.modal-panel')?.classList.add('modal-in');
-  wireModal();
-  const newContent = document.getElementById('m-content') as HTMLTextAreaElement;
-  if (newContent && contentEl) { newContent.scrollTop = scroll; newContent.setSelectionRange(caret, caret); }
 }
 
 function openDownloadMenu(c: Card) {
@@ -1179,7 +1190,7 @@ function runSearch(q: string) {
       results.push({ type: 'board', board: b, label: b.name, sub: `Board · ${b.cards.length} cards` });
     }
     for (const c of b.cards) {
-      const hay = `${c.title}\n${c.content}\n${c.language}`.toLowerCase();
+      const hay = `${c.title}\n${stripTags(c.content)}\n${c.language}`.toLowerCase();
       if (!query || hay.includes(query)) {
         results.push({
           type: 'card', board: b, card: c, label: c.title,
@@ -1213,7 +1224,7 @@ function renderSearchResults(query: string) {
         ? `<span class="w-7 h-7 rounded-lg grid place-items-center bg-white/5 text-mist-300"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></span>`
         : `<span class="w-7 h-7 rounded-lg grid place-items-center" style="background:${h}26"><span class="w-2.5 h-2.5 rounded-full" style="background:${h}"></span></span>`;
       const snippet = r.card && r.card.content
-        ? `<div class="text-mist-400 text-xs truncate mt-0.5">${highlightMatch(r.card.content.replace(/\s+/g, ' ').slice(0, 90), query)}</div>` : '';
+        ? `<div class="text-mist-400 text-xs truncate mt-0.5">${highlightMatch(stripTags(r.card.content).replace(/\s+/g, ' ').slice(0, 90), query)}</div>` : '';
       return `<button class="s-item w-full text-left flex items-center gap-3 px-3 py-3 rounded-2xl ${i === searchIndex ? 'bg-white/10 s-active' : 'hover:bg-white/5'}" data-idx="${i}">
         <span class="shrink-0">${icon}</span>
         <span class="min-w-0 flex-1">
@@ -1520,7 +1531,7 @@ function initAssistant() {
     let best: any = null, score = 0;
     for (const b of state.boards) for (const c of b.cards) {
       const title = c.title.toLowerCase();
-      const hay = `${title} ${c.content.toLowerCase()}`;
+      const hay = `${title} ${stripTags(c.content).toLowerCase()}`;
       let s = 0;
       if (q && title.includes(q)) s = 100;
       else { s += words.filter((w) => title.includes(w)).length * 10; s += words.filter((w) => hay.includes(w)).length * 2; }
@@ -1549,7 +1560,7 @@ function initAssistant() {
   // open a card and read its contents aloud
   function readCard(board: Board, card: Card) {
     showCard(board, card);
-    const body = card.content.trim();
+    const body = htmlToPlain(card.content);
     statusEl.textContent = `Reading “${card.title}”…`;
     addLine('ai', `Reading “${card.title}”.`);
     speak(body ? `${card.title}. ${forSpeech(body)}` : `${card.title}. This card is empty.`);
@@ -1682,9 +1693,82 @@ function initAssistant() {
   } catch {}
 }
 
+/* ================== rich-text selection toolbar =================== */
+function initFormatToolbar() {
+  if (document.getElementById('fmt-bar')) return;
+  const colorIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c.9 0 1.6-.7 1.6-1.6 0-.4-.2-.8-.4-1.1-.2-.3-.4-.6-.4-1 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5c0-3.9-4-7-9-7Z"/><circle cx="7.5" cy="10.5" r="1" fill="currentColor"/><circle cx="12" cy="7.5" r="1" fill="currentColor"/><circle cx="16.5" cy="10.5" r="1" fill="currentColor"/></svg>';
+  const bar = document.createElement('div');
+  bar.id = 'fmt-bar';
+  bar.className = 'fixed z-[95] hidden glass rounded-xl shadow-2xl p-1 flex items-center gap-0.5';
+  bar.innerHTML = `
+    <button data-cmd="bold" class="fmt-btn" title="Bold"><b>B</b></button>
+    <button data-cmd="italic" class="fmt-btn" title="Italic"><i>I</i></button>
+    <button data-cmd="underline" class="fmt-btn" title="Underline"><span style="text-decoration:underline">U</span></button>
+    <span class="w-px h-5 bg-white/15 mx-0.5"></span>
+    <button id="fmt-color" class="fmt-btn" title="Text colour">${colorIcon}</button>`;
+  document.body.appendChild(bar);
+  bar.addEventListener('mousedown', (e) => e.preventDefault()); // keep the editor selection alive
+
+  const editor = () => document.getElementById('m-content');
+  function saveEditor() {
+    const ed = editor(); const c = currentModalCard();
+    if (!ed || !c) return;
+    c.content = ed.innerHTML;
+    updatePreview();
+    scheduleSave();
+  }
+  function exec(cmd: string, val?: string) {
+    try { document.execCommand('styleWithCSS', false, 'true'); document.execCommand(cmd, false, val); } catch {}
+    saveEditor();
+    requestAnimationFrame(updateBar);
+  }
+  bar.querySelectorAll<HTMLElement>('[data-cmd]').forEach((bn) =>
+    bn.addEventListener('click', () => exec(bn.dataset.cmd!))
+  );
+  document.getElementById('fmt-color')!.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closePopovers();
+    const colors = ['#ffffff', '#fbbf24', '#f97316', '#fb7185', '#a78bfa', '#38bdf8', '#34d399', '#f472b6', '#e5e7eb', '#9ca3af'];
+    const anchor = document.getElementById('fmt-color')!;
+    const pop = document.createElement('div');
+    pop.className = 'popover glass rounded-xl p-2 shadow-2xl animate-pop';
+    pop.style.position = 'fixed'; pop.style.zIndex = '97';
+    pop.innerHTML = `<div class="grid grid-cols-5 gap-1.5">${colors.map((c) => `<button class="fmt-color-sw" data-c="${c}" style="background:${c}" title="${c}"></button>`).join('')}</div>`;
+    document.body.appendChild(pop);
+    pop.addEventListener('mousedown', (ev) => ev.preventDefault());
+    const r = anchor.getBoundingClientRect();
+    pop.style.top = `${r.bottom + 6}px`;
+    pop.style.left = `${Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left - 36))}px`;
+    pop.querySelectorAll<HTMLElement>('.fmt-color-sw').forEach((sw) =>
+      sw.addEventListener('click', () => { exec('foreColor', sw.dataset.c!); closePopovers(); })
+    );
+  });
+
+  function updateBar() {
+    const ed = editor(); const c = currentModalCard();
+    if (!ed || !c || c.isCode) { bar.classList.add('hidden'); return; }
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) { bar.classList.add('hidden'); return; }
+    const range = sel.getRangeAt(0);
+    if (!ed.contains(range.commonAncestorContainer)) { bar.classList.add('hidden'); return; }
+    const rect = range.getBoundingClientRect();
+    if (!rect.width && !rect.height) { bar.classList.add('hidden'); return; }
+    bar.classList.remove('hidden');
+    const bw = bar.offsetWidth, bh = bar.offsetHeight;
+    bar.style.left = `${Math.max(8, Math.min(window.innerWidth - bw - 8, rect.left + rect.width / 2 - bw / 2))}px`;
+    bar.style.top = `${Math.max(8, rect.top - bh - 8)}px`;
+  }
+  document.addEventListener('selectionchange', () => requestAnimationFrame(updateBar));
+  document.addEventListener('mousedown', (e) => {
+    const t = e.target as HTMLElement;
+    if (!t.closest('#fmt-bar') && !t.closest('#m-content') && !t.closest('.popover')) bar.classList.add('hidden');
+  });
+}
+
 async function boot() {
   wireGlobal();
   initAssistant();
+  initFormatToolbar();
   renderUser();
   try {
     const data = await api<{ user: User; boards: Board[] }>('/api/data');
