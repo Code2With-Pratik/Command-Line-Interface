@@ -1,6 +1,7 @@
 # CLIDesk 
 
-![CLIDesk App Screenshot](./public/screenshot.png)
+<img width="1919" height="1078" alt="image" src="https://github.com/user-attachments/assets/438d08e7-cc7e-4610-91d7-0bda311bb713" />
+
 
 > Your personal, authenticated vault for **commands, shortcuts, snippets, websites, tools & links** — organised into boards, colour‑coded, searchable with `Ctrl/⌘ + K`, and exportable to images and PDFs.
 
