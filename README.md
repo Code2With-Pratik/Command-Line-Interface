@@ -1,6 +1,8 @@
 # CLIDesk 
 
-> Your personal, authenticated vault for **commands, shortcuts, snippets, websites, tools & links** — organised into boards, colour‑coded, searchable with `Ctrl/⌘ + K`, and exportable to image or PDF.
+![CLIDesk App Screenshot](./public/screenshot.png)
+
+> Your personal, authenticated vault for **commands, shortcuts, snippets, websites, tools & links** — organised into boards, colour‑coded, searchable with `Ctrl/⌘ + K`, and exportable to images and PDFs.
 
 Built with **Astro 5 (SSR) · Tailwind CSS v4 · Prisma 7 (pg driver adapter) · PostgreSQL**, deployable to Vercel or any Node host.
 
@@ -26,7 +28,7 @@ Built with **Astro 5 (SSR) · Tailwind CSS v4 · Prisma 7 (pg driver adapter) ·
   - **Write / Preview** slide‑tab.
   - Write anything; **URLs become clickable blue links** in the preview.
   - **Code / Text** toggle with **Monokai** syntax highlighting and automatic language detection; a fast **typewriter** reveal plays in the preview when you switch.
-  - **Per‑card font** picker (iOS‑style dropdown) — 11 fonts: Arima, Arimo, Caveat, Dancing Script, DM Sans, Indie Flower, Merienda, Playwrite AU VIC Guides, Playwrite GB J, Poppins, Source Serif 4.
+  - **Per‑card font** picker (iOS‑style dropdown) — 11 fonts: Arima, Arimo, Caveat, Dancing Script, DM Sans, Indie Flower, Merienda, Playwrite AU VIC Guides, Playwrite GB J, Poppins, Source Serif Pro.
   - **Colour** picker, **rename**, **pin**, **favourite**, and a red **Delete**.
   - **⬇ Download** as **PNG** (canvas) or **PDF** (print) from a compact picker.
   - Changes **save automatically**.
@@ -42,14 +44,14 @@ Built with **Astro 5 (SSR) · Tailwind CSS v4 · Prisma 7 (pg driver adapter) ·
 ### AI assistant (voice)
 - A **draggable, bouncing mascot** (gradient orb with a top hat, glasses, blinking eyes and happy/sad/angry/mad faces).
 - **Click** it to play a sound and start **listening** (Web Speech API); **type** in the conversation bar as a fallback.
-- **Domain‑limited on purpose:** it only ever **searches, opens and reads your own cards/boards** — e.g. *“open the windows shortcuts”* opens that card in the Preview tab; *“read the windows shortcuts”* (or *“read this”* on an open card) opens it and **reads the contents aloud**. It does not answer general questions.
+- **Domain‑limited on purpose:** it only ever **searches, opens and reads your own cards/boards** — e.g. *"open the windows shortcuts"* opens that card in the Preview tab; *"read the windows shortcuts"* reads it aloud.
 - Uses the most **natural** browser voice available (Edge "Natural" neural voices sound the most human). A **Stop** button (or tapping the bot) halts speech mid‑sentence.
 - Your words and its replies appear as a **live conversation** at the bottom of the screen.
 - Optional: drop an **`ohhh.mp3`** into `public/` for the click sound (a synthesized tone is used if the file is absent).
 
 ### Look & feel
 - Dark theme, **yellow → orange gradients** on black, rotated **white dotted** backgrounds (dashboard, auth page and intro splash).
-- Animated intro splash: logo + an ASCII “COMMAND LINE INTERFACE” banner.
+- Animated intro splash: logo + an ASCII "COMMAND LINE INTERFACE" banner.
 - Fonts: **Merienda** for headings, **DM Sans** for body. Toasts appear top‑centre.
 
 ---
@@ -106,7 +108,7 @@ Open the URL, sign up, and start adding cards.
 | `npm run db:push` | Push the Prisma schema to the database (create/sync tables) |
 | `npm run db:generate` | Regenerate the Prisma client |
 
-> **Why `prisma generate` is wired into `dev`/`build`:** Prisma 7 has no bundled engine — the client is generated code that must match the schema. Running it on every start/build prevents the classic *“Unknown argument …”* error after a schema change.
+> **Why `prisma generate` is wired into `dev`/`build`:** Prisma 7 has no bundled engine — the client is generated code that must match the schema. Running it on every start/build prevents the classic "Prisma client out of sync" error.
 
 ---
 
@@ -163,13 +165,13 @@ All data endpoints require a valid session; errors are returned as clean JSON.
 3. Deploy. `vercel.json` sets the build command to `prisma generate && astro build`, so the client always matches the schema.
 4. Tables must already exist — run `npm run db:push` once against the same database.
 
-> Pushing to `main` triggers an automatic redeploy. If a schema change ever seems “not saved”, redeploy with **Clear build cache**.
+> Pushing to `main` triggers an automatic redeploy. If a schema change ever seems "not saved", redeploy with **Clear build cache**.
 
 Self‑hosting works too: `npm run build` then `npm run start` on any Node 20+ host with the same env vars.
 
 ---
 
 ## 🔒 Notes
-- Passwords are hashed with Node’s `scrypt`; sessions live in the DB and expire after 30 days.
-- Password reset is a **direct reset** (email + new password, no email‑verification link) — suitable for this app’s scope; harden with an emailed token before any public, multi‑user use.
+- Passwords are hashed with Node's `scrypt`; sessions live in the DB and expire after 30 days.
+- Password reset is a **direct reset** (email + new password, no email‑verification link) — suitable for this app's scope; harden with an emailed token before any public, multi‑user use.
 - `.env` is git‑ignored — your database credentials are never committed.
