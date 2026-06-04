@@ -1351,27 +1351,60 @@ function initAssistant() {
     return null;
   }
 
+  // open a card in the preview tab
+  function showCard(board: Board, card: Card) {
+    state.activeBoardId = board.id;
+    renderAll();
+    closeSidebar();
+    setTimeout(() => { openModal(card.id); setModalView('preview'); }, 90);
+    setFace('happy');
+  }
+  // tidy card content for speech
+  function forSpeech(s: string) {
+    return s.replace(/https?:\/\/\S+/g, 'link').replace(/`+/g, '').replace(/\s+/g, ' ').trim().slice(0, 1400);
+  }
+  // open a card and read its contents aloud
+  function readCard(board: Board, card: Card) {
+    showCard(board, card);
+    const body = card.content.trim();
+    statusEl.textContent = `Reading “${card.title}”…`;
+    addLine('ai', `Reading “${card.title}”.`);
+    speak(body ? `${card.title}. ${forSpeech(body)}` : `${card.title}. This card is empty.`);
+  }
+
   function handle(raw: string) {
     const text = raw.trim();
     if (!text) return;
     addLine('you', text);
-    let q = text.toLowerCase()
+    const lower = text.toLowerCase();
+    const readIntent = /\b(read|recite|narrate)\b/.test(lower);
+
+    let q = lower
       .replace(/^(hey|hi|hello|ok|okay|yo|please)\b[,\s]*/g, '')
       .replace(/^(can|could|would|will)\s+you\b\s*/g, '')
-      .replace(/^(please)\b\s*/g, '')
-      .replace(/^(search(\s+for)?|open|find|show(\s+me)?|go\s+to|pull\s+up|launch|bring\s+up|take\s+me\s+to)\b\s*/g, '')
-      .replace(/^(the|a|my|for)\b\s*/g, '')
+      .replace(/\bplease\b/g, '')
+      .replace(/^(read(\s+(out|aloud|me|to me))?|recite|narrate|search(\s+for)?|open|find|show(\s+me)?|go\s+to|pull\s+up|launch|bring\s+up|take\s+me\s+to)\b\s*/g, '')
+      .replace(/\b(the\s+)?contents?\s+(of\s+)?/g, '')
+      .replace(/\bcards?\b/g, '')
+      .replace(/^(the|a|my|for|out|aloud)\b\s*/g, '')
       .replace(/[?.!]+$/g, '')
       .trim();
-    if (!q) { setFace('sad'); reply('What would you like me to open?'); return; }
+
+    // "read this / it / current" → read the card that's open
+    if (readIntent && (q === '' || /^(this|it|current)$/.test(q)) && modalCardId) {
+      const f = findCard(modalCardId);
+      if (f) { readCard(f.board, f.card); return; }
+    }
+    if (!q) {
+      setFace('sad');
+      reply(readIntent ? 'Open a card, then say “read this”.' : 'What would you like me to open?');
+      return;
+    }
 
     const target = findTarget(q);
     if (target && target.type === 'card') {
-      state.activeBoardId = target.board.id;
-      renderAll();
-      closeSidebar();
-      setTimeout(() => { openModal(target.card.id); setModalView('preview'); }, 90);
-      setFace('happy');
+      if (readIntent) { readCard(target.board, target.card); return; }
+      showCard(target.board, target.card);
       reply(`Opening ${target.card.title}.`);
     } else if (target && target.type === 'board') {
       state.activeBoardId = target.board.id;
@@ -1381,7 +1414,7 @@ function initAssistant() {
       reply(`Opening board ${target.board.name}.`);
     } else {
       setFace('sad');
-      reply(`I couldn't find "${q}" in your boards. I can only search and open your cards.`);
+      reply(`I couldn't find "${q}" in your boards. I can only search, open and read your cards.`);
     }
   }
 
