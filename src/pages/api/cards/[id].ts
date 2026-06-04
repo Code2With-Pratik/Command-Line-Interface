@@ -36,6 +36,13 @@ export const PATCH = handle(async ({ params, request, cookies }) => {
   if (typeof body.font === 'string' && FONTS.includes(body.font)) data.font = body.font;
   if (typeof body.pinned === 'boolean') data.pinned = body.pinned;
   if (typeof body.favorite === 'boolean') data.favorite = body.favorite;
+  if (typeof body.position === 'number' && Number.isFinite(body.position)) data.position = Math.trunc(body.position);
+  // move the card to another of the user's boards
+  if (typeof body.boardId === 'string') {
+    const dest = await prisma.board.findUnique({ where: { id: body.boardId } });
+    if (dest && dest.userId === user.id) data.boardId = body.boardId;
+    else return error('Destination board not found.', 404);
+  }
 
   if (Object.keys(data).length === 0) return error('Nothing to update.');
 

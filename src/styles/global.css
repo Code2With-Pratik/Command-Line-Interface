@@ -208,6 +208,47 @@ select:focus, select:focus-visible {
     color: transparent;
   }
 
+  /* drag-over highlight on a board tab (drop a card to move it) */
+  .tab-row.tab-drop {
+    outline: 2px dashed var(--color-accent);
+    outline-offset: -2px;
+    background: rgba(249, 115, 22, 0.14);
+    border-radius: 0.75rem;
+  }
+  /* smooth card drag */
+  .card-ghost {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 95;
+    pointer-events: none;
+    will-change: transform;
+    box-shadow: 0 28px 64px -14px rgba(0, 0, 0, 0.75);
+    opacity: 0.96;
+  }
+  .card-tile.card-dragging { opacity: 0.3; }
+  .drag-placeholder {
+    border: 2px dashed var(--color-accent);
+    background: rgba(249, 115, 22, 0.08);
+  }
+  .drag-count {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    min-width: 1.45rem;
+    height: 1.45rem;
+    padding: 0 0.35rem;
+    border-radius: 9999px;
+    background: var(--color-accent);
+    color: #1a1205;
+    font-weight: 700;
+    font-size: 0.82rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  }
+
   /* dotted dashboard background — white dots on black, pattern rotated 45deg */
   .dotted-bg {
     position: relative;

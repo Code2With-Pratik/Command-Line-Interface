@@ -51,6 +51,105 @@ const state = {
 const selectedCardIds = new Set<string>();
 let cardClickTimer: number | undefined;
 
+// sortable drag state (mouse): clone follows cursor; a placeholder opens a gap
+let dragState: {
+  ids: string[]; board: Board; tile: HTMLElement;
+  sx: number; sy: number; offX: number; offY: number; started: boolean;
+  ghost: HTMLElement | null; ph: HTMLElement | null; overTab: string | null;
+} | null = null;
+let dragSuppressClick = false;
+
+function onCardDragMove(e: PointerEvent) {
+  if (!dragState) return;
+  const st = dragState;
+  if (!st.started) {
+    if (Math.hypot(e.clientX - st.sx, e.clientY - st.sy) < 6) return;
+    const inner = gridInner();
+    if (!inner) { dragState = null; return; }
+    const r = st.tile.getBoundingClientRect();
+    st.offX = st.sx - r.left;
+    st.offY = st.sy - r.top;
+    // ghost
+    const ghost = st.tile.cloneNode(true) as HTMLElement;
+    ghost.classList.add('card-ghost');
+    ghost.classList.remove('is-selected');
+    ghost.style.width = `${r.width}px`;
+    ghost.style.height = `${r.height}px`;
+    if (st.ids.length > 1) {
+      const badge = document.createElement('div');
+      badge.className = 'drag-count';
+      badge.textContent = String(st.ids.length);
+      ghost.appendChild(badge);
+    }
+    document.body.appendChild(ghost);
+    st.ghost = ghost;
+    // placeholder where the first dragged tile was; remove the dragged tiles
+    const ph = document.createElement('div');
+    ph.className = 'drag-placeholder rounded-2xl';
+    ph.style.height = `${r.height}px`;
+    st.ph = ph;
+    inner.insertBefore(ph, inner.querySelector(`.card-tile[data-card="${st.ids[0]}"]`));
+    st.ids.forEach((id) => inner.querySelector(`.card-tile[data-card="${id}"]`)?.remove());
+    document.body.style.cursor = 'grabbing';
+    st.started = true;
+  }
+
+  st.ghost!.style.transform = `translate(${e.clientX - st.offX}px, ${e.clientY - st.offY}px) rotate(2deg) scale(1.03)`;
+
+  const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+  document.querySelectorAll('.tab-row.tab-drop').forEach((x) => x.classList.remove('tab-drop'));
+  st.overTab = null;
+  const tab = el?.closest('.tab-row') as HTMLElement | null;
+  if (tab?.dataset.board && tab.dataset.board !== st.board.id) {
+    tab.classList.add('tab-drop');
+    st.overTab = tab.dataset.board;
+    if (st.ph) st.ph.style.display = 'none';
+    return;
+  }
+  if (st.ph) st.ph.style.display = '';
+  const inner = gridInner();
+  if (inner && el?.closest('#card-grid')) {
+    const ref = dragInsertRef(inner, e.clientX, e.clientY);
+    if (ref !== st.ph && ref !== st.ph!.nextElementSibling) {
+      flipMove(inner, () => inner.insertBefore(st.ph!, ref));
+    }
+  }
+}
+
+function onCardDragUp() {
+  if (!dragState) return;
+  const st = dragState;
+  dragState = null;
+  if (!st.started) return;
+  document.body.style.cursor = '';
+  st.ghost?.remove();
+  document.querySelectorAll('.tab-row.tab-drop').forEach((x) => x.classList.remove('tab-drop'));
+  dragSuppressClick = true;
+  setTimeout(() => { dragSuppressClick = false; }, 60);
+
+  if (st.overTab) { st.ph?.remove(); moveCardsToBoard(st.ids, st.overTab); return; }
+
+  const inner = gridInner();
+  let index = 0;
+  if (inner && st.ph) index = [...inner.children].indexOf(st.ph);
+  st.ph?.remove();
+
+  const board = st.board;
+  const remaining = sortedCards(board).map((c) => c.id).filter((id) => !st.ids.includes(id));
+  const at = Math.max(0, Math.min(remaining.length, index));
+  const order = [...remaining.slice(0, at), ...st.ids, ...remaining.slice(at)];
+  const changed: string[] = [];
+  order.forEach((id, i) => {
+    const c = board.cards.find((x) => x.id === id);
+    if (c) { if (c.position !== i) changed.push(id); c.position = i; }
+  });
+  renderBoard();
+  changed.forEach((id) => {
+    const c = board.cards.find((x) => x.id === id);
+    if (c) patchCard(id, { position: c.position });
+  });
+}
+
 // touch devices: tap opens, long-press selects, tap-while-selecting toggles
 const isTouch = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
 let lpTimer: number | undefined;
@@ -327,7 +426,7 @@ function renderBoard() {
 function cardHtml(c: Card): string {
   const h = hex(c.color);
   // Coloured border on a dark surface (not a fully coloured card).
-  return `<article class="card-tile group relative rounded-2xl p-4 h-[210px] cursor-pointer animate-rise overflow-hidden flex flex-col ${selectedCardIds.has(c.id) ? 'is-selected' : ''}"
+  return `<article class="card-tile group relative rounded-2xl p-4 h-[210px] cursor-grab active:cursor-grabbing animate-rise overflow-hidden flex flex-col ${selectedCardIds.has(c.id) ? 'is-selected' : ''}"
       data-card="${c.id}"
       style="background:linear-gradient(160deg, ${h}14, rgba(15,15,17,.92));border:1.5px solid ${h}80;box-shadow:0 12px 30px -18px ${h}, inset 0 1px 0 ${h}1f;">
     <span class="absolute left-0 top-0 h-full w-1" style="background:${h}"></span>
@@ -551,6 +650,61 @@ async function deleteSelectedCards() {
     failed ? `Deleted with ${failed} error(s)` : ids.length === 1 ? 'Card deleted' : `${ids.length} cards deleted`,
     failed ? 'err' : 'ok'
   );
+}
+
+/* ===================== drag: reorder & move boards ================= */
+const gridInner = () => document.querySelector('#card-grid .grid') as HTMLElement | null;
+
+// which tile to insert the placeholder before (grid-aware, reading order); null = append
+function dragInsertRef(inner: HTMLElement, x: number, y: number): HTMLElement | null {
+  const tiles = [...inner.querySelectorAll<HTMLElement>('.card-tile')];
+  if (!tiles.length) return null;
+  let nearest = tiles[0], nd = Infinity, ni = 0;
+  tiles.forEach((t, i) => {
+    const r = t.getBoundingClientRect();
+    const d = (x - (r.left + r.width / 2)) ** 2 + (y - (r.top + r.height / 2)) ** 2;
+    if (d < nd) { nd = d; nearest = t; ni = i; }
+  });
+  const r = nearest.getBoundingClientRect();
+  const before = y < r.top + r.height / 2 || (y < r.bottom && x < r.left + r.width / 2);
+  return before ? nearest : tiles[ni + 1] ?? null;
+}
+
+// FLIP: animate children sliding to their new spots when the DOM is mutated (the "make space" effect)
+function flipMove(inner: HTMLElement, mutate: () => void) {
+  const items = [...inner.children] as HTMLElement[];
+  const before = items.map((el) => el.getBoundingClientRect());
+  mutate();
+  items.forEach((el, i) => {
+    const a = before[i], b = el.getBoundingClientRect();
+    const dx = a.left - b.left, dy = a.top - b.top;
+    if (dx || dy) {
+      el.style.transition = 'none';
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+      void el.offsetWidth;
+      el.style.transition = 'transform .2s cubic-bezier(.22,1,.36,1)';
+      el.style.transform = '';
+    }
+  });
+}
+
+function moveCardsToBoard(ids: string[], destBoardId: string) {
+  const dest = state.boards.find((b) => b.id === destBoardId);
+  if (!dest) return;
+  let moved = 0;
+  ids.forEach((id) => {
+    const f = findCard(id);
+    if (!f || f.board.id === destBoardId) return;
+    f.board.cards = f.board.cards.filter((c) => c.id !== id);
+    f.card.boardId = destBoardId;
+    f.card.position = dest.cards.length;
+    dest.cards.push(f.card);
+    selectedCardIds.delete(id);
+    patchCard(id, { boardId: destBoardId, position: f.card.position });
+    moved++;
+  });
+  renderAll();
+  if (moved) toast(moved > 1 ? `Moved ${moved} cards to ${dest.name}` : `Moved to ${dest.name}`);
 }
 
 /* ===================== colour & rename popovers ==================== */
@@ -1121,6 +1275,7 @@ function wireGlobal() {
 
   // card grid delegation
   $('card-grid').addEventListener('click', (e) => {
+    if (dragSuppressClick) return; // a drag just ended — don't treat it as a click
     const t = e.target as HTMLElement;
     if (t.closest('[data-add-card]')) { createCard(); return; }
 
@@ -1196,6 +1351,25 @@ function wireGlobal() {
 
   // delete the selected card(s)
   $('delete-card-btn').addEventListener('click', deleteSelectedCards);
+
+  // ---- sortable drag: hold a card to reorder (others make space), or drop on a tab to move boards ----
+  $('card-grid').addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' || e.button !== 0) return;
+    const t = e.target as HTMLElement;
+    if (t.closest('.act-pin, .act-fav, .act-color, .act-edit, [data-add-card]')) return;
+    const tile = t.closest('.card-tile') as HTMLElement | null;
+    if (!tile) return;
+    const board = activeBoard();
+    if (!board) return;
+    const id = tile.dataset.card!;
+    // if the grabbed card is part of a multi-selection, drag them all (in display order)
+    const ids = selectedCardIds.has(id) && selectedInBoard().length > 1
+      ? sortedCards(board).map((c) => c.id).filter((x) => selectedCardIds.has(x))
+      : [id];
+    dragState = { ids, board, tile, sx: e.clientX, sy: e.clientY, offX: 0, offY: 0, started: false, ghost: null, ph: null, overTab: null };
+  });
+  window.addEventListener('pointermove', onCardDragMove);
+  window.addEventListener('pointerup', onCardDragUp);
 
   // close popovers on outside click
   document.addEventListener('click', (e) => {
