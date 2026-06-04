@@ -1284,6 +1284,11 @@ function initAssistant() {
   pickVoice();
   try { speechSynthesis.addEventListener('voiceschanged', pickVoice); } catch {}
 
+  const showStop = (on: boolean) => { const s = document.getElementById('ai-stop'); if (s) s.classList.toggle('hidden', !on); };
+  function stopSpeaking() {
+    try { speechSynthesis.cancel(); } catch {}
+    showStop(false);
+  }
   const speak = (t: string) => {
     try {
       if (!aiVoice) pickVoice();
@@ -1292,8 +1297,12 @@ function initAssistant() {
       u.rate = 1.0;
       u.pitch = 1.0;
       u.volume = 1;
+      u.onstart = () => showStop(true);
+      u.onend = () => showStop(false);
+      u.onerror = () => showStop(false);
       speechSynthesis.cancel();
       speechSynthesis.speak(u);
+      showStop(true);
     } catch {}
   };
   const addLine = (who: 'you' | 'ai', text: string) => {
@@ -1451,10 +1460,15 @@ function initAssistant() {
   function stopListening() { try { recog && recog.stop(); } catch {} root.classList.remove('listening'); }
 
   const openConvo = () => { convo.classList.remove('hidden'); };
-  function activate() { playOhh(); setFace('happy'); openConvo(); startListening(); }
+  function activate() {
+    // if it's talking, a tap stops it instead of starting a new turn
+    if ((window as any).speechSynthesis && speechSynthesis.speaking) { stopSpeaking(); openConvo(); return; }
+    playOhh(); setFace('happy'); openConvo(); startListening();
+  }
 
   $('ai-mic').addEventListener('click', startListening);
-  $('assistant-close').addEventListener('click', () => { convo.classList.add('hidden'); stopListening(); });
+  $('ai-stop').addEventListener('click', stopSpeaking);
+  $('assistant-close').addEventListener('click', () => { convo.classList.add('hidden'); stopListening(); stopSpeaking(); });
   $('ai-form').addEventListener('submit', (e) => { e.preventDefault(); const v = inputEl.value; inputEl.value = ''; handle(v); });
 
   // ---- drag (and tap = activate) ----
