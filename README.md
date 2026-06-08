@@ -5,7 +5,7 @@
 
 > Your personal, authenticated vault for **commands, shortcuts, snippets, websites, tools & links** — organised into boards, colour‑coded, searchable with `Ctrl/⌘ + K`, and exportable to images and PDFs.
 
-Built with **Astro 5 (SSR) · Tailwind CSS v4 · Prisma 7 (pg driver adapter) · PostgreSQL**, deployable to Vercel or any Node host.
+Built with **Astro 5 (SSR) · Tailwind CSS v4 · Prisma 7 (pg driver adapter) · PostgreSQL**, deployable to Vercel or any Node host..
 
 ---
 
