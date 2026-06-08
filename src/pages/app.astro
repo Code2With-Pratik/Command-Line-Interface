@@ -53,7 +53,7 @@ if (!user) return Astro.redirect('/');
           <div id="user-name" class="truncate text-mist-100 text-base leading-tight">User</div>
           <div id="user-email" class="truncate text-mist-400 text-xs leading-tight"></div>
         </div>
-        <button id="logout-btn" title="Log out" class="icon-btn shrink-0">
+        <button id="logout-btn" title="Log out" class="icon-btn shrink-0 text-rose-400 hover:text-rose-300 hover:!bg-rose-500/15 border-rose-500/30">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
         </button>
       </div>
@@ -101,9 +101,9 @@ if (!user) return Astro.redirect('/');
   <div id="toast-stack" class="fixed top-5 left-1/2 -translate-x-1/2 z-[70] flex flex-col items-center gap-2"></div>
 
   <!-- =========================== AI ASSISTANT =========================== -->
-  <div id="assistant" data-face="happy" class="fixed z-[85] select-none" style="right:20px;bottom:90px;touch-action:none;cursor:grab">
+  <div id="assistant" data-face="happy" class="fixed z-[85] select-none" style="left:18px;bottom:84px;touch-action:none;cursor:grab">
     <div class="assistant-bob">
-      <button id="assistant-btn" type="button" class="block w-[104px] h-[104px] sm:w-[116px] sm:h-[116px] relative" title="Talk to me" aria-label="AI assistant">
+      <button id="assistant-btn" type="button" class="block w-[76px] h-[76px] sm:w-[96px] sm:h-[96px] md:w-[116px] md:h-[116px] relative" title="Talk to me" aria-label="AI assistant">
         <AssistantBot />
       </button>
     </div>

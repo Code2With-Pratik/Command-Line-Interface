@@ -116,8 +116,14 @@ const introArt = `░░░░░░  ░░░░░░  ░░░    ░░░
       <p class="text-mist-300 text-sm mb-4 leading-relaxed">Enter your email and a new password.</p>
       <form id="reset-form" class="space-y-3" novalidate>
         <input class="field" id="reset-email" type="email" autocomplete="email" placeholder="you@example.com" />
-        <input class="field" id="reset-pass" type="password" autocomplete="new-password" placeholder="New password" />
-        <input class="field" id="reset-pass2" type="password" autocomplete="new-password" placeholder="Confirm new password" />
+        <div class="relative">
+          <input class="field pr-11" id="reset-pass" type="password" autocomplete="new-password" placeholder="New password" />
+          <button type="button" class="reset-eye absolute right-2 top-1/2 -translate-y-1/2 grid place-items-center w-8 h-8 rounded-lg text-mist-400 hover:text-mist-100" data-eye="reset-pass" aria-label="Show password"><span></span></button>
+        </div>
+        <div class="relative">
+          <input class="field pr-11" id="reset-pass2" type="password" autocomplete="new-password" placeholder="Confirm new password" />
+          <button type="button" class="reset-eye absolute right-2 top-1/2 -translate-y-1/2 grid place-items-center w-8 h-8 rounded-lg text-mist-400 hover:text-mist-100" data-eye="reset-pass2" aria-label="Show password"><span></span></button>
+        </div>
         <div class="grid grid-cols-2 gap-2.5 pt-1">
           <button type="button" class="btn btn-ghost w-full justify-center" data-reset-close>Cancel</button>
           <button type="submit" id="reset-submit" class="btn btn-primary w-full justify-center">Reset</button>
@@ -247,6 +253,18 @@ const introArt = `░░░░░░  ░░░░░░  ░░░    ░░░
       const show = passInput.type === 'password';
       passInput.type = show ? 'text' : 'password';
       eyeIcon.innerHTML = show ? EYE_OFF : EYE;
+    });
+
+    // eye toggles inside the reset dialog
+    document.querySelectorAll<HTMLButtonElement>('.reset-eye').forEach((btn) => {
+      const span = btn.querySelector('span') as HTMLElement;
+      const input = document.getElementById(btn.dataset.eye!) as HTMLInputElement;
+      span.innerHTML = EYE;
+      btn.addEventListener('click', () => {
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        span.innerHTML = show ? EYE_OFF : EYE;
+      });
     });
 
     // ---- forgot / reset password ----------------------------------------------

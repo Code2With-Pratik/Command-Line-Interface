@@ -59,6 +59,7 @@ let dragState: {
 } | null = null;
 let dragSuppressClick = false;
 let suppressRise = false; // skip the card fade-in animation on drag/drop re-renders
+let dragFlipLock = false; // rate-limit gap re-flows so they don't jitter
 
 function onCardDragMove(e: PointerEvent) {
   if (!dragState) return;
@@ -73,7 +74,7 @@ function onCardDragMove(e: PointerEvent) {
     // ghost
     const ghost = st.tile.cloneNode(true) as HTMLElement;
     ghost.classList.add('card-ghost');
-    ghost.classList.remove('is-selected');
+    ghost.classList.remove('is-selected', 'animate-rise');
     ghost.style.width = `${r.width}px`;
     ghost.style.height = `${r.height}px`;
     if (st.ids.length > 1) {
@@ -110,10 +111,12 @@ function onCardDragMove(e: PointerEvent) {
   }
   if (st.ph) st.ph.style.display = '';
   const inner = gridInner();
-  if (inner && el?.closest('#card-grid')) {
+  if (inner && el?.closest('#card-grid') && !dragFlipLock) {
     const ref = dragInsertRef(inner, e.clientX, e.clientY);
     if (ref !== st.ph && ref !== st.ph!.nextElementSibling) {
+      dragFlipLock = true;
       flipMove(inner, () => inner.insertBefore(st.ph!, ref));
+      setTimeout(() => { dragFlipLock = false; }, 180);
     }
   }
 }
@@ -1499,31 +1502,44 @@ function initAssistant() {
   };
   const reply = (text: string) => { statusEl.textContent = text; addLine('ai', text); speak(text); };
 
-  // play the click sound — uses /public/ohhh.mp3 if present, else a synth "ohh"
-  function synthOhh() {
+  // ---- sounds: click ("ouch"), happy (correct), angry (wrong) ----
+  // Each uses a /public file if present, otherwise a synthesized fallback.
+  function synthSeq(seq: [number, number, number?][], type: OscillatorType = 'sine') {
     try {
       const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
       const ctx = new Ctx();
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = 'sine';
-      o.frequency.setValueAtTime(430, ctx.currentTime);
-      o.frequency.exponentialRampToValueAtTime(240, ctx.currentTime + 0.28);
-      g.gain.setValueAtTime(0.0001, ctx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.04);
-      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.38);
-      o.connect(g); g.connect(ctx.destination);
-      o.start(); o.stop(ctx.currentTime + 0.4);
+      let t = ctx.currentTime;
+      for (const [f, d, v = 0.25] of seq) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = type;
+        o.frequency.setValueAtTime(f, t);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(v, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(t); o.stop(t + d + 0.03);
+        t += d * 0.92;
+      }
     } catch {}
   }
-  const SOUNDS = ['/Voicy_ouch.mp3', '/ohhh.mp3'];
-  const playOhh = () => {
+  const synthOuch = () => synthSeq([[430, 0.12], [250, 0.26]], 'sine');
+  const synthHappy = () => synthSeq([[523, 0.1], [659, 0.1], [784, 0.16]], 'sine');
+  const synthAngry = () => synthSeq([[170, 0.16, 0.3], [120, 0.24, 0.3]], 'sawtooth');
+  const SOUND_FILES: Record<string, string[]> = {
+    click: ['/Voicy_ouch.mp3', '/ohhh.mp3'],
+    happy: ['/happy.mp3'],
+    angry: ['/angry.mp3'],
+  };
+  function playSound(kind: 'click' | 'happy' | 'angry') {
+    const files = SOUND_FILES[kind] || [];
+    const fallback = kind === 'happy' ? synthHappy : kind === 'angry' ? synthAngry : synthOuch;
     let i = 0;
     const tryNext = () => {
-      if (i >= SOUNDS.length) { synthOhh(); return; }
-      try { const a = new Audio(SOUNDS[i++]); a.volume = 0.8; a.play().catch(tryNext); } catch { tryNext(); }
+      if (i >= files.length) { fallback(); return; }
+      try { const a = new Audio(files[i++]); a.volume = 0.8; a.play().catch(tryNext); } catch { tryNext(); }
     };
     tryNext();
-  };
+  }
 
   // ---- domain-limited command handling (only searches/opens your stuff) ----
   function findTarget(q: string): { type: 'card'; board: Board; card: Card } | { type: 'board'; board: Board } | null {
@@ -1560,6 +1576,7 @@ function initAssistant() {
   // open a card and read its contents aloud
   function readCard(board: Board, card: Card) {
     showCard(board, card);
+    playSound('happy');
     const body = htmlToPlain(card.content);
     statusEl.textContent = `Reading “${card.title}”…`;
     addLine('ai', `Reading “${card.title}”.`);
@@ -1599,15 +1616,18 @@ function initAssistant() {
     if (target && target.type === 'card') {
       if (readIntent) { readCard(target.board, target.card); return; }
       showCard(target.board, target.card);
+      playSound('happy');
       reply(`Opening ${target.card.title}.`);
     } else if (target && target.type === 'board') {
       state.activeBoardId = target.board.id;
       renderAll();
       closeSidebar();
       setFace('happy');
+      playSound('happy');
       reply(`Opening board ${target.board.name}.`);
     } else {
-      setFace('sad');
+      setFace('angry');
+      playSound('angry');
       reply(`I couldn't find "${q}" in your boards. I can only search, open and read your cards.`);
     }
   }
@@ -1648,7 +1668,7 @@ function initAssistant() {
   function activate() {
     // if it's talking, a tap stops it instead of starting a new turn
     if ((window as any).speechSynthesis && speechSynthesis.speaking) { stopSpeaking(); openConvo(); return; }
-    playOhh(); setFace('happy'); openConvo(); startListening();
+    playSound('click'); setFace('happy'); openConvo(); startListening();
   }
 
   $('ai-mic').addEventListener('click', startListening);
@@ -1686,11 +1706,23 @@ function initAssistant() {
     else { try { localStorage.setItem('clidesk:ai-pos', JSON.stringify({ left: root.style.left, top: root.style.top })); } catch {} }
   });
 
-  // restore saved position
+  // restore saved position (clamped to the current viewport so it never lands off-screen)
   try {
     const saved = JSON.parse(localStorage.getItem('clidesk:ai-pos') || 'null');
-    if (saved?.left && saved?.top) { root.style.left = saved.left; root.style.top = saved.top; root.style.right = 'auto'; root.style.bottom = 'auto'; }
+    if (saved?.left && saved?.top) {
+      const w = root.offsetWidth || 96, h = root.offsetHeight || 96;
+      const left = Math.max(6, Math.min(window.innerWidth - w - 6, parseFloat(saved.left)));
+      const top = Math.max(6, Math.min(window.innerHeight - h - 6, parseFloat(saved.top)));
+      root.style.left = `${left}px`; root.style.top = `${top}px`; root.style.right = 'auto'; root.style.bottom = 'auto';
+    }
   } catch {}
+  // keep it on-screen if the window is resized
+  window.addEventListener('resize', () => {
+    if (root.style.left === 'auto' || !root.style.left) return;
+    const w = root.offsetWidth, h = root.offsetHeight;
+    root.style.left = `${Math.max(6, Math.min(window.innerWidth - w - 6, parseFloat(root.style.left)))}px`;
+    root.style.top = `${Math.max(6, Math.min(window.innerHeight - h - 6, parseFloat(root.style.top)))}px`;
+  });
 }
 
 /* ================== rich-text selection toolbar =================== */
