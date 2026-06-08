@@ -4,7 +4,7 @@ import { json, error, handle } from '../../../lib/http';
 
 export const prerender = false;
 
-const COLORS = ['violet', 'rose', 'amber', 'emerald', 'sky', 'fuchsia', 'lime', 'orange', 'cyan', 'indigo'];
+const COLORS = ['violet', 'indigo', 'blue', 'sky', 'azure', 'cyan', 'teal', 'mint', 'emerald', 'green', 'forest', 'lime', 'yellow', 'gold', 'amber', 'orange', 'coral', 'red', 'scarlet', 'rose', 'pink', 'magenta', 'fuchsia', 'grape', 'purple'];
 const FONTS = ['Arima', 'Arimo', 'Caveat', 'Dancing Script', 'DM Sans', 'Indie Flower', 'Merienda', 'Playwrite AU VIC Guides', 'Playwrite GB J', 'Poppins', 'Source Serif 4'];
 
 async function ownCard(userId: string, id: string) {

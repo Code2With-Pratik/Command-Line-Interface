@@ -4,7 +4,7 @@ import { json, error, handle } from '../../../lib/http';
 
 export const prerender = false;
 
-const COLORS = ['violet', 'rose', 'amber', 'emerald', 'sky', 'fuchsia', 'lime', 'orange', 'cyan', 'indigo'];
+const COLORS = ['violet', 'indigo', 'blue', 'sky', 'azure', 'cyan', 'teal', 'mint', 'emerald', 'green', 'forest', 'lime', 'yellow', 'gold', 'amber', 'orange', 'coral', 'red', 'scarlet', 'rose', 'pink', 'magenta', 'fuchsia', 'grape', 'purple'];
 
 // Create a new card inside a board.
 export const POST = handle(async ({ request, cookies }) => {

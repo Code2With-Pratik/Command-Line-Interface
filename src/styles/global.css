@@ -494,6 +494,51 @@ select:focus, select:focus-visible {
 }
 .fmt-color-sw:hover { transform: scale(1.12); }
 
+/* link-colour swatches in the selection toolbar's link popover */
+.lk-sw {
+  width: 100%;
+  height: 1.5rem;
+  border-radius: 0.4rem;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.lk-sw:hover { transform: scale(1.08); }
+.lk-sw.lk-sw-on { outline: 2px solid #fff; outline-offset: 1px; }
+
+/* font dropdown — staggered "unfold" reveal (each option cascades in) */
+.font-menu { transform-origin: top center; animation: fm-fade 0.14s ease-out; }
+.font-menu .font-anim {
+  opacity: 0;
+  transform-origin: top center;
+  animation: font-unfold 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes fm-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes font-unfold {
+  0%   { opacity: 0; transform: translateY(-7px) scaleY(0.55); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scaleY(1); }
+}
+
+/* dictation wave (mic speak-to-type) */
+#m-wave .wave-bar {
+  width: 5px;
+  height: 12px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, var(--color-accent, #f97316), #fde047);
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.6);
+  transition: height 0.08s linear;
+}
+#m-wave.wave-idle .wave-bar {
+  animation: wave-idle 1s ease-in-out infinite;
+}
+#m-wave.wave-idle .wave-bar:nth-child(odd) { animation-delay: 0.18s; }
+#m-wave.wave-idle .wave-bar:nth-child(3n) { animation-delay: 0.34s; }
+@keyframes wave-idle {
+  0%, 100% { height: 12px; }
+  50% { height: 64px; }
+}
+
 /* lists inside rich content (Tailwind preflight resets these) */
 .rich-content ul { list-style: disc; padding-left: 1.5em; margin: 0.25em 0; }
 .rich-content ol { list-style: decimal; padding-left: 1.6em; margin: 0.25em 0; }

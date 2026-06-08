@@ -25,10 +25,15 @@ interface User { id: string; email: string; username: string; }
 
 /* ============================ color palette ========================= */
 const PALETTE: Record<string, { hex: string }> = {
-  violet: { hex: '#7c5cff' }, rose: { hex: '#f43f5e' }, amber: { hex: '#f59e0b' },
-  emerald: { hex: '#10b981' }, sky: { hex: '#0ea5e9' }, fuchsia: { hex: '#d946ef' },
-  lime: { hex: '#84cc16' }, orange: { hex: '#f97316' }, cyan: { hex: '#06b6d4' },
-  indigo: { hex: '#6366f1' },
+  violet: { hex: '#7c5cff' }, indigo: { hex: '#6366f1' }, blue: { hex: '#3b82f6' },
+  sky: { hex: '#0ea5e9' }, azure: { hex: '#38bdf8' }, cyan: { hex: '#06b6d4' },
+  teal: { hex: '#14b8a6' }, mint: { hex: '#2dd4bf' }, emerald: { hex: '#10b981' },
+  green: { hex: '#22c55e' }, forest: { hex: '#15803d' }, lime: { hex: '#84cc16' },
+  yellow: { hex: '#eab308' }, gold: { hex: '#fbbf24' }, amber: { hex: '#f59e0b' },
+  orange: { hex: '#f97316' }, coral: { hex: '#fb7185' }, red: { hex: '#ef4444' },
+  scarlet: { hex: '#dc2626' }, rose: { hex: '#f43f5e' }, pink: { hex: '#ec4899' },
+  magenta: { hex: '#e879f9' }, fuchsia: { hex: '#d946ef' }, grape: { hex: '#c084fc' },
+  purple: { hex: '#a855f7' },
 };
 const COLOR_NAMES = Object.keys(PALETTE);
 const hex = (c: string) => PALETTE[c]?.hex ?? PALETTE.violet.hex;
@@ -329,6 +334,7 @@ const ICON = {
   alignRight: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M9 12h12M6 18h15"/></svg>',
   alignJustify: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>',
   listBullet: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="3.5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="3.5" cy="18" r="1.4" fill="currentColor" stroke="none"/></svg>',
+  mic: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg>',
 };
 
 /* ====================== content rendering ========================== */
@@ -781,13 +787,13 @@ function openFontMenu(cardId: string, anchor: HTMLElement) {
   const c = found.card;
   const check = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="color:var(--card-accent,#f97316)"><path d="M20 6 9 17l-5-5"/></svg>';
   const pop = document.createElement('div');
-  pop.className = 'popover font-menu glass rounded-2xl p-1.5 shadow-2xl animate-pop';
+  pop.className = 'popover font-menu glass rounded-2xl p-1.5 shadow-2xl';
   pop.style.position = 'fixed';
   pop.style.zIndex = '90';
   pop.style.maxHeight = '56vh';
   pop.style.overflowY = 'auto';
   pop.innerHTML = FONTS.map(
-    (f) => `<button class="font-opt w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-left ${f === fontOf(c) ? 'bg-white/10' : 'hover:bg-white/5'}" data-font="${esc(f)}">
+    (f, i) => `<button class="font-opt font-anim w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-left ${f === fontOf(c) ? 'bg-white/10' : 'hover:bg-white/5'}" data-font="${esc(f)}" style="animation-delay:${i * 26}ms">
       <span class="truncate text-base" style="font-family:'${f}'">${esc(f)}</span>
       ${f === fontOf(c) ? check : ''}
     </button>`
@@ -860,6 +866,8 @@ function openModal(cardId: string) {
 }
 
 function closeModal() {
+  (window as any).__hideFmtBar?.();
+  (window as any).__stopDictation?.();
   if (typeTimer) { clearInterval(typeTimer); typeTimer = undefined; }
   if (saveTimer) { clearTimeout(saveTimer); flushSave(); }
   const root = $('card-modal');
@@ -915,14 +923,17 @@ function modalHtml(c: Card): string {
         <button id="m-align" type="button" title="Alignment" class="btn btn-ghost !py-1.5 !px-2 text-sm">${ICON.alignLeft}</button>
         <button id="m-list" type="button" title="Lists" class="btn btn-ghost !py-1.5 !px-2 text-sm">${ICON.listBullet}</button>
       </div>
-      <span class="w-px h-6 bg-white/10 mx-1 hidden sm:block"></span>
-      <button id="m-pin" class="btn btn-ghost !py-1.5 !px-2.5 text-sm min-w-0 sm:min-w-[6.5rem] ${c.pinned ? '!border-accent/40' : ''}" style="${c.pinned ? `color:${h}` : ''}">${ICON.pin} <span class="hidden sm:inline">${c.pinned ? 'Pinned' : 'Pin'}</span></button>
-      <button id="m-fav" class="btn btn-ghost !py-1.5 !px-2.5 text-sm min-w-0 sm:min-w-[6.75rem]" style="${c.favorite ? 'color:#fbbf24' : ''}">${c.favorite ? ICON.starFill : ICON.star} <span class="hidden sm:inline">${c.favorite ? 'Starred' : 'Star'}</span></button>
-      <button id="m-delete" class="btn !py-1.5 !px-2.5 text-sm ml-auto text-rose-400 border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20">${ICON.trash} <span class="hidden sm:inline">Delete</span></button>
+      <button id="m-dictate" type="button" title="Dictate — speak to type" class="btn btn-ghost !py-1.5 !px-2.5 text-sm">${ICON.mic} <span class="hidden sm:inline">Dictate</span></button>
+      <div class="flex items-center gap-2 ml-auto">
+        <span class="w-px h-6 bg-white/10 hidden sm:block"></span>
+        <button id="m-pin" class="btn btn-ghost !py-1.5 !px-2.5 text-sm min-w-0 sm:min-w-[6.5rem] ${c.pinned ? '!border-accent/40' : ''}" style="${c.pinned ? `color:${h}` : ''}">${ICON.pin} <span class="hidden sm:inline">${c.pinned ? 'Pinned' : 'Pin'}</span></button>
+        <button id="m-fav" class="btn btn-ghost !py-1.5 !px-2.5 text-sm min-w-0 sm:min-w-[6.75rem]" style="${c.favorite ? 'color:#fbbf24' : ''}">${c.favorite ? ICON.starFill : ICON.star} <span class="hidden sm:inline">${c.favorite ? 'Starred' : 'Star'}</span></button>
+        <button id="m-delete" title="Delete card" class="btn !py-1.5 !px-2.5 text-sm text-rose-400 border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20">${ICON.trash} <span class="hidden lg:inline">Delete</span></button>
+      </div>
     </div>
 
     <!-- body: compact Write/Preview switch (top-left) + single pane -->
-    <div class="flex-1 min-h-0 px-4 sm:px-5 pt-3 pb-3 flex flex-col">
+    <div class="flex-1 min-h-0 px-4 sm:px-5 pt-3 pb-3 flex flex-col relative">
       <div class="mb-2.5">
         <div class="relative grid grid-cols-2 w-40 p-0.5 rounded-lg bg-ink-800 border border-ink-600 text-sm">
           <span id="m-seg-slider" class="absolute top-0.5 left-0.5 bottom-0.5 w-[calc(50%-0.125rem)] rounded-md bg-ink-600 transition-transform duration-200 ease-out"></span>
@@ -934,6 +945,7 @@ function modalHtml(c: Card): string {
         data-ph="Type anything here. Select text to format it; paste a command and toggle Code."
         class="flex-1 min-h-0 overflow-auto outline-none rounded-xl bg-black/30 border border-white/10 p-4 text-lg leading-relaxed break-words rich-content whitespace-pre-wrap"></div>
       <div id="m-preview" class="hidden flex-1 min-h-0 overflow-auto rounded-xl bg-black/20 border border-white/10 p-4 text-lg break-words">${renderContent(c, { full: true })}</div>
+      <div id="m-wave" class="hidden absolute left-1/2 -translate-x-1/2 bottom-6 z-30 items-end justify-center gap-[4px] h-20 pointer-events-none"></div>
     </div>
     <div class="px-5 py-1.5 text-xs text-mist-400 border-t border-white/5">Changes save automatically.</div>
   </div>`;
@@ -1037,14 +1049,8 @@ function wireModal() {
   titleEl.addEventListener('input', scheduleSave);
 
   contentEl.addEventListener('input', () => {
+    // never auto-switch mode while editing/formatting — Code/Text is manual only
     c.content = contentEl.innerHTML;
-    const plain = htmlToPlain(c.content);
-    // auto-detect code on the fly (only flips ON automatically)
-    if (!c.isCode && looksLikeCode(plain)) {
-      c.isCode = true;
-      c.language = detectLanguage(plain);
-      syncCodeUi();
-    }
     updatePreview();
     scheduleSave();
   });
@@ -1096,19 +1102,89 @@ function wireModal() {
     persistEditor();
   }
   let curSize = 18;
+  // Read the font-size (px) of whatever the selection currently sits in, so the
+  // +/- steppers step from the real value and keep working on repeated clicks.
+  function selectionFontSize(): number {
+    const ed = document.getElementById('m-content');
+    const sel = window.getSelection();
+    if (!ed || !sel || !sel.anchorNode) return curSize;
+    let node: Node | null = sel.anchorNode;
+    // if the boundary sits in an element, descend to the child it actually points at
+    if (node.nodeType === 1) {
+      const el = node as Element;
+      node = el.childNodes[sel.anchorOffset] || el.childNodes[Math.max(0, sel.anchorOffset - 1)] || el;
+    }
+    let el = (node && node.nodeType === 1 ? node : node?.parentElement) as HTMLElement | null;
+    while (el && el !== ed) {
+      const fs = el.style?.fontSize;
+      if (fs && fs.endsWith('px')) return Math.round(parseFloat(fs));
+      el = el.parentElement;
+    }
+    const probe = (node && node.nodeType === 1 ? node : node?.parentElement) as HTMLElement | null;
+    if (probe && probe !== ed) { const cs = parseFloat(getComputedStyle(probe).fontSize); if (cs) return Math.round(cs); }
+    return curSize;
+  }
   function applySize(px: number) {
     curSize = Math.max(8, Math.min(96, px));
     const sv = document.getElementById('m-size-val');
     if (sv) sv.textContent = String(curSize);
     const ed = document.getElementById('m-content');
     if (!ed) return;
+    // fast path: the selection is already exactly one font-size span → just retune
+    // it in place. Keeps repeated +/- from nesting a new span on every click.
+    const selF = window.getSelection();
+    if (selF && selF.rangeCount && !selF.isCollapsed) {
+      const rng = selF.getRangeAt(0);
+      let anc: Node | null = rng.commonAncestorContainer;
+      if (anc && anc.nodeType === 3) anc = anc.parentElement;
+      const span = anc && (anc as HTMLElement).closest
+        ? ((anc as HTMLElement).closest('span[style*="font-size"]') as HTMLElement | null)
+        : null;
+      if (span && span !== ed && ed.contains(span) && rng.toString() === (span.textContent || '') && rng.toString().length) {
+        span.style.fontSize = `${curSize}px`;
+        const r2 = document.createRange();
+        r2.selectNodeContents(span);
+        selF.removeAllRanges();
+        selF.addRange(r2);
+        persistEditor();
+        return;
+      }
+    }
+    // force <font> output (a prior align/list may have flipped styleWithCSS on)
+    try { document.execCommand('styleWithCSS', false, 'false'); } catch {}
     try { document.execCommand('fontSize', false, '7'); } catch {}
+    const swapped: HTMLSpanElement[] = [];
     ed.querySelectorAll('font[size="7"]').forEach((f) => {
       const s = document.createElement('span');
       s.style.fontSize = `${curSize}px`;
       while (f.firstChild) s.appendChild(f.firstChild);
       f.replaceWith(s);
+      swapped.push(s);
     });
+    // drop now-redundant font-sizes on descendants so the new size always wins
+    // and nested spans don't pile up across repeated clicks
+    swapped.forEach((s) => {
+      s.querySelectorAll('span[style*="font-size"]').forEach((inner) => {
+        (inner as HTMLElement).style.fontSize = '';
+        if (!(inner as HTMLElement).getAttribute('style')) inner.removeAttribute('style');
+      });
+    });
+    // restore the selection over the resized text — replaceWith() above wiped it,
+    // which is why a second +/- click previously did nothing
+    if (swapped.length) {
+      const sel = window.getSelection();
+      if (sel) {
+        const first = swapped[0];
+        const last = swapped[swapped.length - 1];
+        const range = document.createRange();
+        // select INSIDE the spans (not the parent positions) so the next read of
+        // selectionFontSize() resolves to the resized span, keeping +/- repeatable
+        range.setStart(first, 0);
+        range.setEnd(last, last.childNodes.length);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    }
     persistEditor();
   }
   function openCmdMenu(anchor: HTMLElement, items: { cmd: string; icon: string; label: string }[]) {
@@ -1134,8 +1210,8 @@ function wireModal() {
   ['m-size-dec', 'm-size-inc', 'm-align', 'm-list'].forEach((id) =>
     document.getElementById(id)?.addEventListener('mousedown', (e) => e.preventDefault())
   );
-  $('m-size-dec').addEventListener('click', () => applySize(curSize - 2));
-  $('m-size-inc').addEventListener('click', () => applySize(curSize + 2));
+  $('m-size-dec').addEventListener('click', () => applySize(selectionFontSize() - 2));
+  $('m-size-inc').addEventListener('click', () => applySize(selectionFontSize() + 2));
   $('m-align').addEventListener('click', (e) => {
     e.stopPropagation();
     openCmdMenu($('m-align'), [
@@ -1207,6 +1283,139 @@ function wireModal() {
   document.getElementById('seg-write')?.addEventListener('click', () => setModalView('write'));
   document.getElementById('seg-preview')?.addEventListener('click', () => setModalView('preview'));
   setModalView(modalView); // apply the current view
+
+  // ---------- dictation: speak-to-type into the editor ----------
+  const dictateBtn = $('m-dictate');
+  const waveEl = $('m-wave');
+  let dictating = false;
+  let dictRecog: any = null;
+  let micStream: MediaStream | null = null;
+  let waveRAF = 0;
+
+  function showWave(on: boolean) {
+    waveEl.classList.toggle('hidden', !on);
+    waveEl.classList.toggle('flex', on);
+    if (on && !waveEl.childElementCount) {
+      waveEl.innerHTML = Array.from({ length: 13 }, () => '<span class="wave-bar"></span>').join('');
+    }
+  }
+  async function startWave() {
+    showWave(true);
+    const bars = Array.from(waveEl.querySelectorAll('.wave-bar')) as HTMLElement[];
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      const ctx = new Ctx();
+      const src = ctx.createMediaStreamSource(micStream);
+      const an = ctx.createAnalyser();
+      an.fftSize = 64;
+      an.smoothingTimeConstant = 0.78;
+      src.connect(an);
+      const data = new Uint8Array(an.frequencyBinCount);
+      const loop = () => {
+        an.getByteFrequencyData(data);
+        for (let i = 0; i < bars.length; i++) {
+          const v = data[i % data.length] / 255;
+          bars[i].style.height = `${12 + v * 56}px`;
+        }
+        waveRAF = requestAnimationFrame(loop);
+      };
+      loop();
+    } catch {
+      // mic stream blocked → fall back to a synthetic CSS pulse so the bar still animates
+      waveEl.classList.add('wave-idle');
+    }
+  }
+  function stopWave() {
+    if (waveRAF) cancelAnimationFrame(waveRAF);
+    waveRAF = 0;
+    waveEl.classList.remove('wave-idle');
+    showWave(false);
+    if (micStream) {
+      micStream.getTracks().forEach((t) => t.stop());
+      micStream = null;
+    }
+  }
+  function insertDictated(text: string) {
+    const ed = document.getElementById('m-content') as HTMLElement | null;
+    if (!ed) return;
+    ed.focus();
+    try {
+      document.execCommand('insertText', false, text);
+    } catch {
+      ed.appendChild(document.createTextNode(text));
+    }
+    c.content = ed.innerHTML;
+    updatePreview();
+    scheduleSave();
+  }
+  function startDictation() {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) {
+      toast("Voice typing isn't supported in this browser.", 'err');
+      return;
+    }
+    if (c.isCode) {
+      // dictation writes prose; keep it in the editable area regardless
+    }
+    dictating = true;
+    dictateBtn.classList.add('!bg-rose-500/20', '!border-rose-500/40', '!text-rose-200', 'dictating');
+    document.getElementById('m-content')?.focus();
+    startWave();
+    dictRecog = new SR();
+    dictRecog.lang = 'en-US';
+    dictRecog.continuous = true;
+    dictRecog.interimResults = true;
+    let lastFinal = '';
+    dictRecog.onresult = (e: any) => {
+      let finalChunk = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) finalChunk += r[0].transcript;
+      }
+      if (finalChunk && finalChunk !== lastFinal) {
+        lastFinal = finalChunk;
+        insertDictated(finalChunk.replace(/\s+$/, '') + ' ');
+      }
+    };
+    dictRecog.onend = () => {
+      // browsers stop after a pause — restart to keep listening until the user turns it off
+      if (dictating) {
+        try {
+          dictRecog.start();
+        } catch {
+          /* already starting */
+        }
+      }
+    };
+    dictRecog.onerror = (ev: any) => {
+      if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+        toast('Microphone permission denied.', 'err');
+        stopDictation();
+      }
+    };
+    try {
+      dictRecog.start();
+    } catch {
+      /* noop */
+    }
+  }
+  function stopDictation() {
+    dictating = false;
+    try {
+      dictRecog && dictRecog.stop();
+    } catch {
+      /* noop */
+    }
+    dictRecog = null;
+    dictateBtn.classList.remove('!bg-rose-500/20', '!border-rose-500/40', '!text-rose-200', 'dictating');
+    stopWave();
+  }
+  dictateBtn.addEventListener('click', () => {
+    if (dictating) stopDictation();
+    else startDictation();
+  });
+  (window as any).__stopDictation = stopDictation;
 
   // close handlers
   $('card-modal').querySelectorAll('[data-close]').forEach((el) =>
@@ -1625,19 +1834,12 @@ function initAssistant() {
     } catch {}
   }
   const synthOuch = () => synthSeq([[430, 0.12], [250, 0.26]], 'sine');
-  const synthHappy = () => synthSeq([[523, 0.1], [659, 0.1], [784, 0.16]], 'sine');
-  const synthAngry = () => synthSeq([[170, 0.16, 0.3], [120, 0.24, 0.3]], 'sawtooth');
-  const SOUND_FILES: Record<string, string[]> = {
-    click: ['/Voicy_ouch.mp3', '/ohhh.mp3'],
-    happy: ['/happy.wav'],
-    angry: ['/angry.wav'],
-  };
-  function playSound(kind: 'click' | 'happy' | 'angry') {
-    const files = SOUND_FILES[kind] || [];
-    const fallback = kind === 'happy' ? synthHappy : kind === 'angry' ? synthAngry : synthOuch;
+  // click sound only (happy/angry removed)
+  function playSound(_kind?: string) {
+    const files = ['/Voicy_ouch.mp3', '/ohhh.mp3'];
     let i = 0;
     const tryNext = () => {
-      if (i >= files.length) { fallback(); return; }
+      if (i >= files.length) { synthOuch(); return; }
       try { const a = new Audio(files[i++]); a.volume = 0.8; a.play().catch(tryNext); } catch { tryNext(); }
     };
     tryNext();
@@ -1678,7 +1880,6 @@ function initAssistant() {
   // open a card and read its contents aloud
   function readCard(board: Board, card: Card) {
     showCard(board, card);
-    playSound('happy');
     const body = htmlToPlain(card.content);
     statusEl.textContent = `Reading “${card.title}”…`;
     addLine('ai', `Reading “${card.title}”.`);
@@ -1718,18 +1919,15 @@ function initAssistant() {
     if (target && target.type === 'card') {
       if (readIntent) { readCard(target.board, target.card); return; }
       showCard(target.board, target.card);
-      playSound('happy');
       reply(`Opening ${target.card.title}.`);
     } else if (target && target.type === 'board') {
       state.activeBoardId = target.board.id;
       renderAll();
       closeSidebar();
       setFace('happy');
-      playSound('happy');
       reply(`Opening board ${target.board.name}.`);
     } else {
-      setFace('angry');
-      playSound('angry');
+      setFace('sad');
       reply(`I couldn't find "${q}" in your boards. I can only search, open and read your cards.`);
     }
   }
@@ -1814,6 +2012,7 @@ function initAssistant() {
 function initFormatToolbar() {
   if (document.getElementById('fmt-bar')) return;
   const colorIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c.9 0 1.6-.7 1.6-1.6 0-.4-.2-.8-.4-1.1-.2-.3-.4-.6-.4-1 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5c0-3.9-4-7-9-7Z"/><circle cx="7.5" cy="10.5" r="1" fill="currentColor"/><circle cx="12" cy="7.5" r="1" fill="currentColor"/><circle cx="16.5" cy="10.5" r="1" fill="currentColor"/></svg>';
+  const linkIcon = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
   const bar = document.createElement('div');
   bar.id = 'fmt-bar';
   bar.className = 'fixed z-[95] hidden glass rounded-xl shadow-2xl p-1 flex items-center gap-0.5';
@@ -1822,6 +2021,7 @@ function initFormatToolbar() {
     <button data-cmd="italic" class="fmt-btn" title="Italic"><i>I</i></button>
     <button data-cmd="underline" class="fmt-btn" title="Underline"><span style="text-decoration:underline">U</span></button>
     <span class="w-px h-5 bg-white/15 mx-0.5"></span>
+    <button id="fmt-link" class="fmt-btn" title="Add link">${linkIcon}</button>
     <button id="fmt-color" class="fmt-btn" title="Text colour">${colorIcon}</button>`;
   document.body.appendChild(bar);
   bar.addEventListener('mousedown', (e) => e.preventDefault()); // keep the editor selection alive
@@ -1867,6 +2067,101 @@ function initFormatToolbar() {
     );
   });
 
+  // ---- link: wrap the selection in a clickable <a>, with an optional colour ----
+  const LINK_COLORS = ['', '#4ea3ff', '#38bdf8', '#34d399', '#fbbf24', '#f97316', '#f43f5e', '#a78bfa', '#f472b6'];
+  function normalizeUrl(raw: string): string {
+    const u = raw.trim();
+    if (!u) return '';
+    if (/^(https?:\/\/|mailto:|tel:|\/|#)/i.test(u)) return u;
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u)) return `mailto:${u}`;
+    return `https://${u}`;
+  }
+  function anchorInSelection(): HTMLAnchorElement | null {
+    const ed = editor();
+    const sel = window.getSelection();
+    if (!ed || !sel || !sel.rangeCount) return null;
+    let n: Node | null = sel.getRangeAt(0).commonAncestorContainer;
+    if (n && n.nodeType === 3) n = n.parentElement;
+    const a = n && (n as HTMLElement).closest ? ((n as HTMLElement).closest('a') as HTMLAnchorElement | null) : null;
+    return a && ed.contains(a) ? a : null;
+  }
+  document.getElementById('fmt-link')!.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const ed = editor();
+    const sel = window.getSelection();
+    if (!ed || !sel || !sel.rangeCount) return;
+    const savedRange = sel.getRangeAt(0).cloneRange(); // focusing the input loses the selection
+    if (!ed.contains(savedRange.commonAncestorContainer)) return;
+    const existing = anchorInSelection();
+    let chosen = (existing && (existing as HTMLElement).style.color) || '';
+    closePopovers();
+    const anchor = document.getElementById('fmt-link')!;
+    const pop = document.createElement('div');
+    pop.className = 'popover glass rounded-xl p-2.5 shadow-2xl animate-pop';
+    pop.style.position = 'fixed'; pop.style.zIndex = '97';
+    pop.innerHTML = `
+      <div class="flex flex-col gap-2 w-64">
+        <input id="lk-url" class="field !py-1.5 text-sm" placeholder="https://example.com" autocomplete="off" spellcheck="false" />
+        <div class="flex flex-col gap-1">
+          <span class="text-xs text-mist-400">Link colour</span>
+          <div class="grid grid-cols-9 gap-1">
+            ${LINK_COLORS.map((c) => `<button class="lk-sw" data-c="${c}" title="${c || 'Default blue'}" style="${c ? `background:${c}` : 'background:linear-gradient(135deg,#4ea3ff,#60a5fa)'}"></button>`).join('')}
+          </div>
+        </div>
+        <div class="flex items-center gap-2 mt-0.5">
+          <button id="lk-apply" class="btn btn-primary !py-1.5 flex-1 justify-center text-sm">${existing ? 'Update link' : 'Add link'}</button>
+          ${existing ? '<button id="lk-remove" class="btn btn-ghost !py-1.5 justify-center text-sm !text-rose-300 border border-rose-500/30">Remove</button>' : ''}
+        </div>
+      </div>`;
+    document.body.appendChild(pop);
+    const r = anchor.getBoundingClientRect();
+    pop.style.top = `${Math.min(r.bottom + 6, window.innerHeight - pop.offsetHeight - 10)}px`;
+    pop.style.left = `${Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left - 80))}px`;
+
+    const urlInput = pop.querySelector('#lk-url') as HTMLInputElement;
+    if (existing) urlInput.value = existing.getAttribute('href') || '';
+    const swatches = [...pop.querySelectorAll<HTMLElement>('.lk-sw')];
+    const markChosen = () => swatches.forEach((s) => s.classList.toggle('lk-sw-on', (s.dataset.c || '') === chosen));
+    markChosen();
+    swatches.forEach((s) =>
+      s.addEventListener('click', (ev) => { ev.preventDefault(); chosen = s.dataset.c || ''; markChosen(); urlInput.focus(); })
+    );
+
+    function restore() {
+      const ssel = window.getSelection();
+      if (!ssel) return;
+      (ed as HTMLElement).focus();
+      ssel.removeAllRanges();
+      ssel.addRange(savedRange);
+    }
+    function applyLink() {
+      const href = normalizeUrl(urlInput.value);
+      if (!href) { urlInput.focus(); return; }
+      restore();
+      try { document.execCommand('styleWithCSS', false, 'true'); document.execCommand('createLink', false, href); } catch {}
+      const sel2 = window.getSelection();
+      const range2 = sel2 && sel2.rangeCount ? sel2.getRangeAt(0) : null;
+      (ed as HTMLElement).querySelectorAll('a').forEach((a) => {
+        const hit = range2 ? range2.intersectsNode(a) : a.getAttribute('href') === href;
+        if (!hit) return;
+        a.setAttribute('href', href);
+        a.setAttribute('target', '_blank');
+        a.setAttribute('rel', 'noopener noreferrer');
+        (a as HTMLElement).style.color = chosen || '';
+      });
+      window.getSelection()?.collapseToEnd(); // drop the highlight so the bar tucks away
+      saveEditor();
+      closePopovers();
+      bar.classList.add('hidden');
+    }
+    (pop.querySelector('#lk-apply') as HTMLElement).addEventListener('click', applyLink);
+    urlInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); applyLink(); } });
+    const rm = pop.querySelector('#lk-remove') as HTMLElement | null;
+    if (rm) rm.addEventListener('click', () => { restore(); try { document.execCommand('unlink'); } catch {} window.getSelection()?.collapseToEnd(); saveEditor(); closePopovers(); bar.classList.add('hidden'); });
+
+    requestAnimationFrame(() => urlInput.focus());
+  });
+
   function updateBar() {
     const ed = editor(); const c = currentModalCard();
     if (!ed || !c || c.isCode) { bar.classList.add('hidden'); return; }
@@ -1881,11 +2176,87 @@ function initFormatToolbar() {
     bar.style.left = `${Math.max(8, Math.min(window.innerWidth - bw - 8, rect.left + rect.width / 2 - bw / 2))}px`;
     bar.style.top = `${Math.max(8, rect.top - bh - 8)}px`;
   }
+  // re-evaluate on any selection change, and at the end of a drag-select / keyboard select
   document.addEventListener('selectionchange', () => requestAnimationFrame(updateBar));
-  document.addEventListener('mousedown', (e) => {
+  document.addEventListener('mouseup', () => requestAnimationFrame(updateBar));
+  document.addEventListener('keyup', () => requestAnimationFrame(updateBar));
+  // hide only when clicking somewhere that isn't the editor, the bar or a popover
+  // (so re-selecting text always re-shows it; updateBar also hides on a collapsed selection)
+  document.addEventListener('pointerdown', (e) => {
     const t = e.target as HTMLElement;
-    if (!t.closest('#fmt-bar') && !t.closest('#m-content') && !t.closest('.popover')) bar.classList.add('hidden');
+    if (!t.closest('#fmt-bar') && !t.closest('#m-content') && !t.closest('.popover') && !t.closest('#m-textfmt') && !t.closest('#fmt-color')) {
+      bar.classList.add('hidden');
+    }
   });
+  // ---- hover / click preview for links inside the Write editor ----
+  const extIcon = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>';
+  const pencilIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+  const unlinkIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18.84 12.25 1.72-1.71a4 4 0 0 0-5.66-5.66l-1.71 1.72"/><path d="m5.17 11.75-1.71 1.71a4 4 0 0 0 5.66 5.66l1.71-1.72"/><line x1="8" y1="2" x2="8" y2="5"/><line x1="2" y1="8" x2="5" y2="8"/><line x1="16" y1="19" x2="16" y2="22"/><line x1="19" y1="16" x2="22" y2="16"/></svg>';
+  const linkPrev = document.createElement('div');
+  linkPrev.id = 'link-preview';
+  linkPrev.className = 'fixed z-[96] hidden glass rounded-lg shadow-2xl px-2 py-1.5 flex items-center gap-1.5 text-sm';
+  document.body.appendChild(linkPrev);
+  let lpHideT: any = null;
+  function hideLinkPrev(now = false) {
+    clearTimeout(lpHideT);
+    if (now) { linkPrev.classList.add('hidden'); return; }
+    lpHideT = setTimeout(() => linkPrev.classList.add('hidden'), 180);
+  }
+  function removeLink(a: HTMLAnchorElement) {
+    const parent = a.parentNode;
+    if (parent) { while (a.firstChild) parent.insertBefore(a.firstChild, a); parent.removeChild(a); }
+    hideLinkPrev(true);
+    saveEditor();
+  }
+  function editLink(a: HTMLAnchorElement) {
+    const sel = window.getSelection();
+    if (!sel) return;
+    const r = document.createRange();
+    r.selectNodeContents(a);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    hideLinkPrev(true);
+    document.getElementById('fmt-link')!.click(); // reuse the link popover (prefilled)
+  }
+  function showLinkPrev(a: HTMLAnchorElement) {
+    const ed = editor();
+    if (!ed || !ed.contains(a) || (ed as HTMLElement).offsetParent === null) return; // Write mode only
+    clearTimeout(lpHideT);
+    const href = a.getAttribute('href') || '';
+    const disp = href.replace(/^https?:\/\//, '').replace(/^mailto:/, '');
+    linkPrev.innerHTML = `
+      <a href="${esc(href)}" target="_blank" rel="noopener noreferrer" class="lp-open flex items-center gap-1.5 min-w-0 max-w-[280px] text-sky-300 hover:underline" title="Open ${esc(href)}">${extIcon}<span class="truncate">${esc(disp)}</span></a>
+      <span class="w-px h-4 bg-white/15"></span>
+      <button class="lp-edit fmt-btn !w-7 !h-7" title="Edit link">${pencilIcon}</button>
+      <button class="lp-remove fmt-btn !w-7 !h-7 !text-rose-300" title="Remove link">${unlinkIcon}</button>`;
+    linkPrev.classList.remove('hidden');
+    const r = a.getBoundingClientRect();
+    const pw = linkPrev.offsetWidth, ph = linkPrev.offsetHeight;
+    let top = r.bottom + 6;
+    if (top + ph > window.innerHeight - 8) top = r.top - ph - 6;
+    linkPrev.style.top = `${Math.max(8, top)}px`;
+    linkPrev.style.left = `${Math.max(8, Math.min(window.innerWidth - pw - 8, r.left))}px`;
+    (linkPrev.querySelector('.lp-edit') as HTMLElement).onclick = (ev) => { ev.preventDefault(); ev.stopPropagation(); editLink(a); };
+    (linkPrev.querySelector('.lp-remove') as HTMLElement).onclick = (ev) => { ev.preventDefault(); ev.stopPropagation(); removeLink(a); };
+  }
+  document.addEventListener('mouseover', (e) => {
+    const a = (e.target as HTMLElement).closest?.('#m-content a') as HTMLAnchorElement | null;
+    if (a) showLinkPrev(a);
+  });
+  document.addEventListener('mouseout', (e) => {
+    const a = (e.target as HTMLElement).closest?.('#m-content a');
+    const to = (e as MouseEvent).relatedTarget as HTMLElement | null;
+    if (a && !(to && (to.closest?.('#m-content a') === a || to.closest?.('#link-preview')))) hideLinkPrev();
+  });
+  document.addEventListener('click', (e) => {
+    const a = (e.target as HTMLElement).closest?.('#m-content a') as HTMLAnchorElement | null;
+    if (a) showLinkPrev(a); // click a link in Write mode → show its preview chip
+  });
+  linkPrev.addEventListener('mouseenter', () => clearTimeout(lpHideT));
+  linkPrev.addEventListener('mouseleave', () => hideLinkPrev());
+
+  // expose a hide hook so closing the modal clears it
+  (window as any).__hideFmtBar = () => { bar.classList.add('hidden'); linkPrev.classList.add('hidden'); };
 }
 
 async function boot() {
