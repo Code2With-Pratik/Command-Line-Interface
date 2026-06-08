@@ -461,9 +461,15 @@ select:focus, select:focus-visible {
   color: var(--color-mist-400);
   pointer-events: none;
 }
+/* the editor always wraps to the box width (never a runaway single line) */
+#m-content {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  overflow-x: hidden;
+}
 #m-content.code-mode {
   font-family: "SFMono-Regular", ui-monospace, "JetBrains Mono", Consolas, monospace !important;
-  white-space: pre;
 }
 
 /* rich-text selection toolbar */

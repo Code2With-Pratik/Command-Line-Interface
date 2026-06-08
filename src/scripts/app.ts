@@ -894,7 +894,7 @@ function modalHtml(c: Card): string {
 
     <!-- toolbar -->
     <div class="flex flex-wrap items-center gap-2 px-5 py-2.5 border-b border-white/5 text-sm">
-      <div class="flex items-center gap-1.5">${colorSwatches(c.color)}</div>
+      <button id="m-color-btn" type="button" title="Card colour" class="w-8 h-8 rounded-lg shrink-0 border-2 border-white/20" style="background:${h}"></button>
       <span class="w-px h-6 bg-white/10 mx-1"></span>
       <button id="m-code" title="Toggle between code and plain text" class="btn btn-ghost !py-1.5 !px-2.5 text-sm min-w-0 sm:min-w-[6rem]"><span id="m-code-icon">${c.isCode ? ICON.text : ICON.code}</span> <span id="m-code-label" class="hidden sm:inline">${c.isCode ? 'Text' : 'Code'}</span></button>
       <button id="m-font-btn" type="button" title="Card font" class="field !w-28 sm:!w-44 !py-1.5 !px-2.5 text-sm flex items-center justify-between gap-1.5">
@@ -1035,22 +1035,39 @@ function wireModal() {
     scheduleSave();
   });
 
-  // colour swatches
-  document.querySelectorAll<HTMLElement>('#card-modal .swatch').forEach((sw) =>
-    sw.addEventListener('click', async () => {
-      c.color = sw.dataset.color!;
-      refreshModalChrome();
-      // recolor header/border live
-      const h = hex(c.color);
-      const panel = $('card-modal').querySelector('.modal-panel') as HTMLElement;
-      panel.style.borderColor = `${h}55`;
-      panel.style.setProperty('--card-accent', h);
-      (panel.querySelector('div') as HTMLElement).style.background = h;
-      (panel.querySelector('header span') as HTMLElement).style.background = h;
-      (document.getElementById('m-title') as HTMLInputElement).style.borderColor = `${h}99`;
-      await patchCard(c.id, { color: c.color });
-    })
-  );
+  // apply a card colour everywhere in the modal + persist
+  function applyModalColor(color: string) {
+    c.color = color;
+    const h = hex(color);
+    const panel = $('card-modal').querySelector('.modal-panel') as HTMLElement;
+    panel.style.borderColor = `${h}55`;
+    panel.style.setProperty('--card-accent', h);
+    (panel.querySelector('div') as HTMLElement).style.background = h;
+    (panel.querySelector('header span') as HTMLElement).style.background = h;
+    (document.getElementById('m-title') as HTMLInputElement).style.borderColor = `${h}99`;
+    const btn = document.getElementById('m-color-btn');
+    if (btn) btn.style.background = h;
+    updatePreview();
+    patchCard(c.id, { color });
+  }
+  // colour picker: a single swatch button opens the full palette (saves toolbar space)
+  $('m-color-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (document.querySelector('.color-menu')) { closePopovers(); return; }
+    const anchor = $('m-color-btn');
+    const pop = document.createElement('div');
+    pop.className = 'popover color-menu glass rounded-xl p-2.5 shadow-2xl animate-pop';
+    pop.style.position = 'fixed';
+    pop.style.zIndex = '97';
+    pop.innerHTML = `<div class="grid grid-cols-5 gap-2">${colorSwatches(c.color)}</div>`;
+    document.body.appendChild(pop);
+    const r = anchor.getBoundingClientRect();
+    pop.style.top = `${Math.min(r.bottom + 6, window.innerHeight - pop.offsetHeight - 10)}px`;
+    pop.style.left = `${Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left))}px`;
+    pop.querySelectorAll<HTMLElement>('.swatch').forEach((sw) =>
+      sw.addEventListener('click', () => { applyModalColor(sw.dataset.color!); closePopovers(); })
+    );
+  });
 
   const codeBtn = $('m-code');
   const fontBtn = $('m-font-btn');
@@ -1760,7 +1777,13 @@ function initFormatToolbar() {
   document.getElementById('fmt-color')!.addEventListener('click', (e) => {
     e.stopPropagation();
     closePopovers();
-    const colors = ['#ffffff', '#fbbf24', '#f97316', '#fb7185', '#a78bfa', '#38bdf8', '#34d399', '#f472b6', '#e5e7eb', '#9ca3af'];
+    const colors = [
+      '#ffffff', '#e5e7eb', '#9ca3af', '#6b7280', '#111827',
+      '#fca5a5', '#fb7185', '#f43f5e', '#ef4444', '#b91c1c',
+      '#fdba74', '#f97316', '#fbbf24', '#fde047', '#a3e635',
+      '#34d399', '#10b981', '#22d3ee', '#38bdf8', '#3b82f6',
+      '#818cf8', '#a78bfa', '#c084fc', '#e879f9', '#f472b6',
+    ];
     const anchor = document.getElementById('fmt-color')!;
     const pop = document.createElement('div');
     pop.className = 'popover glass rounded-xl p-2 shadow-2xl animate-pop';
