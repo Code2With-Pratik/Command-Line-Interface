@@ -324,6 +324,11 @@ const ICON = {
   close: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
   code: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></svg>',
   text: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>',
+  alignLeft: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h12M3 18h15"/></svg>',
+  alignCenter: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M6 12h12M5 18h14"/></svg>',
+  alignRight: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M9 12h12M6 18h15"/></svg>',
+  alignJustify: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>',
+  listBullet: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="3.5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="3.5" cy="18" r="1.4" fill="currentColor" stroke="none"/></svg>',
 };
 
 /* ====================== content rendering ========================== */
@@ -901,6 +906,15 @@ function modalHtml(c: Card): string {
         <span id="m-font-label" class="truncate" style="font-family:'${esc(fontOf(c))}'">${esc(fontOf(c))}</span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 text-mist-400"><path d="m6 9 6 6 6-6"/></svg>
       </button>
+      <div id="m-textfmt" class="flex items-center gap-1.5 ${c.isCode ? 'hidden' : ''}">
+        <div class="flex items-center rounded-lg bg-ink-800 border border-ink-600 overflow-hidden text-mist-100">
+          <button id="m-size-dec" title="Smaller" class="px-2 py-1.5 hover:bg-white/10 leading-none text-lg">−</button>
+          <span id="m-size-val" class="px-1 text-sm tabular-nums w-7 text-center select-none">18</span>
+          <button id="m-size-inc" title="Larger" class="px-2 py-1.5 hover:bg-white/10 leading-none text-lg">+</button>
+        </div>
+        <button id="m-align" type="button" title="Alignment" class="btn btn-ghost !py-1.5 !px-2 text-sm">${ICON.alignLeft}</button>
+        <button id="m-list" type="button" title="Lists" class="btn btn-ghost !py-1.5 !px-2 text-sm">${ICON.listBullet}</button>
+      </div>
       <span class="w-px h-6 bg-white/10 mx-1 hidden sm:block"></span>
       <button id="m-pin" class="btn btn-ghost !py-1.5 !px-2.5 text-sm min-w-0 sm:min-w-[6.5rem] ${c.pinned ? '!border-accent/40' : ''}" style="${c.pinned ? `color:${h}` : ''}">${ICON.pin} <span class="hidden sm:inline">${c.pinned ? 'Pinned' : 'Pin'}</span></button>
       <button id="m-fav" class="btn btn-ghost !py-1.5 !px-2.5 text-sm min-w-0 sm:min-w-[6.75rem]" style="${c.favorite ? 'color:#fbbf24' : ''}">${c.favorite ? ICON.starFill : ICON.star} <span class="hidden sm:inline">${c.favorite ? 'Starred' : 'Star'}</span></button>
@@ -1069,6 +1083,76 @@ function wireModal() {
     );
   });
 
+  // ---- Google-Docs-style text controls: size stepper, alignment, lists ----
+  function persistEditor() {
+    const ed = document.getElementById('m-content');
+    if (!ed) return;
+    c.content = ed.innerHTML;
+    updatePreview();
+    scheduleSave();
+  }
+  function docCmd(cmd: string, val?: string) {
+    try { document.execCommand('styleWithCSS', false, 'true'); document.execCommand(cmd, false, val); } catch {}
+    persistEditor();
+  }
+  let curSize = 18;
+  function applySize(px: number) {
+    curSize = Math.max(8, Math.min(96, px));
+    const sv = document.getElementById('m-size-val');
+    if (sv) sv.textContent = String(curSize);
+    const ed = document.getElementById('m-content');
+    if (!ed) return;
+    try { document.execCommand('fontSize', false, '7'); } catch {}
+    ed.querySelectorAll('font[size="7"]').forEach((f) => {
+      const s = document.createElement('span');
+      s.style.fontSize = `${curSize}px`;
+      while (f.firstChild) s.appendChild(f.firstChild);
+      f.replaceWith(s);
+    });
+    persistEditor();
+  }
+  function openCmdMenu(anchor: HTMLElement, items: { cmd: string; icon: string; label: string }[]) {
+    if (document.querySelector('.cmd-menu')) { closePopovers(); return; }
+    closePopovers();
+    const pop = document.createElement('div');
+    pop.className = 'popover cmd-menu glass rounded-xl p-1.5 shadow-2xl animate-pop';
+    pop.style.position = 'fixed';
+    pop.style.zIndex = '97';
+    pop.innerHTML = items
+      .map((it) => `<button class="cmd-opt w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 text-left text-sm whitespace-nowrap" data-cmd="${it.cmd}"><span class="w-4 grid place-items-center">${it.icon}</span><span>${it.label}</span></button>`)
+      .join('');
+    document.body.appendChild(pop);
+    pop.addEventListener('mousedown', (ev) => ev.preventDefault());
+    const r = anchor.getBoundingClientRect();
+    pop.style.top = `${Math.min(r.bottom + 6, window.innerHeight - pop.offsetHeight - 10)}px`;
+    pop.style.left = `${Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left))}px`;
+    pop.querySelectorAll<HTMLElement>('.cmd-opt').forEach((bn) =>
+      bn.addEventListener('click', () => { docCmd(bn.dataset.cmd!); closePopovers(); })
+    );
+  }
+  // keep the editor selection/caret alive when using these controls
+  ['m-size-dec', 'm-size-inc', 'm-align', 'm-list'].forEach((id) =>
+    document.getElementById(id)?.addEventListener('mousedown', (e) => e.preventDefault())
+  );
+  $('m-size-dec').addEventListener('click', () => applySize(curSize - 2));
+  $('m-size-inc').addEventListener('click', () => applySize(curSize + 2));
+  $('m-align').addEventListener('click', (e) => {
+    e.stopPropagation();
+    openCmdMenu($('m-align'), [
+      { cmd: 'justifyLeft', icon: ICON.alignLeft, label: 'Left' },
+      { cmd: 'justifyCenter', icon: ICON.alignCenter, label: 'Center' },
+      { cmd: 'justifyRight', icon: ICON.alignRight, label: 'Right' },
+      { cmd: 'justifyFull', icon: ICON.alignJustify, label: 'Justify' },
+    ]);
+  });
+  $('m-list').addEventListener('click', (e) => {
+    e.stopPropagation();
+    openCmdMenu($('m-list'), [
+      { cmd: 'insertUnorderedList', icon: ICON.listBullet, label: 'Bulleted list' },
+      { cmd: 'insertOrderedList', icon: '<span class="text-xs font-bold">1.</span>', label: 'Numbered list' },
+    ]);
+  });
+
   const codeBtn = $('m-code');
   const fontBtn = $('m-font-btn');
   function syncCodeUi() {
@@ -1078,6 +1162,7 @@ function wireModal() {
     if (iconEl) iconEl.innerHTML = c.isCode ? ICON.text : ICON.code;
     if (labelEl) labelEl.textContent = c.isCode ? 'Text' : 'Code';
     document.getElementById('m-content')?.classList.toggle('code-mode', c.isCode);
+    document.getElementById('m-textfmt')?.classList.toggle('hidden', c.isCode);
   }
   codeBtn.addEventListener('click', () => {
     c.isCode = !c.isCode;
@@ -1778,7 +1863,7 @@ function initFormatToolbar() {
     e.stopPropagation();
     closePopovers();
     const colors = [
-      '#ffffff', '#e5e7eb', '#9ca3af', '#6b7280', '#111827',
+      '#ffffff', '#e5e7eb', '#cbd5e1', '#9ca3af', '#2dd4bf',
       '#fca5a5', '#fb7185', '#f43f5e', '#ef4444', '#b91c1c',
       '#fdba74', '#f97316', '#fbbf24', '#fde047', '#a3e635',
       '#34d399', '#10b981', '#22d3ee', '#38bdf8', '#3b82f6',
