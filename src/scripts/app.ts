@@ -1629,8 +1629,8 @@ function initAssistant() {
   const synthAngry = () => synthSeq([[170, 0.16, 0.3], [120, 0.24, 0.3]], 'sawtooth');
   const SOUND_FILES: Record<string, string[]> = {
     click: ['/Voicy_ouch.mp3', '/ohhh.mp3'],
-    happy: ['/happy.mp3'],
-    angry: ['/angry.mp3'],
+    happy: ['/happy.wav'],
+    angry: ['/angry.wav'],
   };
   function playSound(kind: 'click' | 'happy' | 'angry') {
     const files = SOUND_FILES[kind] || [];
@@ -1805,25 +1805,8 @@ function initAssistant() {
     dragging = false;
     root.classList.remove('dragging');
     if (!moved) activate();
-    else { try { localStorage.setItem('clidesk:ai-pos', JSON.stringify({ left: root.style.left, top: root.style.top })); } catch {} }
-  });
-
-  // restore saved position (clamped to the current viewport so it never lands off-screen)
-  try {
-    const saved = JSON.parse(localStorage.getItem('clidesk:ai-pos') || 'null');
-    if (saved?.left && saved?.top) {
-      const w = root.offsetWidth || 96, h = root.offsetHeight || 96;
-      const left = Math.max(6, Math.min(window.innerWidth - w - 6, parseFloat(saved.left)));
-      const top = Math.max(6, Math.min(window.innerHeight - h - 6, parseFloat(saved.top)));
-      root.style.left = `${left}px`; root.style.top = `${top}px`; root.style.right = 'auto'; root.style.bottom = 'auto';
-    }
-  } catch {}
-  // keep it on-screen if the window is resized
-  window.addEventListener('resize', () => {
-    if (root.style.left === 'auto' || !root.style.left) return;
-    const w = root.offsetWidth, h = root.offsetHeight;
-    root.style.left = `${Math.max(6, Math.min(window.innerWidth - w - 6, parseFloat(root.style.left)))}px`;
-    root.style.top = `${Math.max(6, Math.min(window.innerHeight - h - 6, parseFloat(root.style.top)))}px`;
+    // position is intentionally NOT persisted — it always returns to the
+    // bottom-left home on refresh (the default inline style).
   });
 }
 
