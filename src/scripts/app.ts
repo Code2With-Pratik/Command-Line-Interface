@@ -466,7 +466,7 @@ function cardHtml(c: Card): string {
   // Coloured border on a dark surface (not a fully coloured card).
   return `<article class="card-tile group relative rounded-2xl p-4 h-[210px] cursor-grab active:cursor-grabbing overflow-hidden flex flex-col ${suppressRise ? '' : 'animate-rise'} ${selectedCardIds.has(c.id) ? 'is-selected' : ''}"
       data-card="${c.id}"
-      style="--card-accent:${h};background:linear-gradient(160deg, ${h}14, rgba(15,15,17,.92));border:1.5px solid ${h}80;box-shadow:0 12px 30px -18px ${h}, inset 0 1px 0 ${h}1f;">
+      style="--card-accent:${h};background:linear-gradient(160deg, ${h}14, rgba(15,15,17,.92));border:1.5px solid ${h}80;">
     <span class="absolute left-0 top-0 h-full w-1" style="background:${h}"></span>
     <div class="flex items-start gap-2 mb-2 pl-1.5">
       <h3 class="font-heading text-xl leading-snug flex-1 min-w-0 truncate text-mist-100" title="${esc(c.title)}">${esc(c.title)}</h3>
@@ -494,15 +494,24 @@ style.textContent = `
 .mini-btn{display:inline-flex;align-items:center;justify-content:center;width:1.85rem;height:1.85rem;border-radius:.55rem;color:#c8c8d2;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(6px);transition:background .15s,color .15s,transform .1s}
 .mini-btn:hover{background:rgba(0,0,0,.7);color:#fff}
 .mini-btn:active{transform:scale(.9)}
-.card-tile{transition:transform .16s ease, box-shadow .18s ease-out, outline-color .16s ease;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.card-tile{
+  transition:transform .16s ease, box-shadow .25s ease-out, outline-color .16s ease;
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  /* same 3-layer structure as :hover so box-shadow interpolates smoothly
+     (the two glow layers are invisible at rest: blur 0, shrunk behind the card) */
+  box-shadow:
+    var(--gx,0px) var(--gy,0px) 0px -8px transparent,
+    var(--gx,0px) var(--gy,0px) 0px -12px transparent,
+    0 12px 30px -18px var(--card-accent);
+}
 .card-tile:hover{
   transform:translateY(-3px);
   box-shadow:
-    var(--gx,0px) var(--gy,0px) 32px -6px var(--card-accent),
-    var(--gx,0px) var(--gy,0px) 66px -12px var(--card-accent),
-    0 18px 38px -24px rgba(0,0,0,.85) !important;
+    var(--gx,0px) var(--gy,0px) 30px -6px var(--card-accent),
+    var(--gx,0px) var(--gy,0px) 64px -12px var(--card-accent),
+    0 18px 38px -22px var(--card-accent);
 }
-#card-grid.is-dragging .card-tile:hover{transform:none;box-shadow:0 12px 30px -18px var(--card-accent) !important}
+#card-grid.is-dragging .card-tile:hover{transform:none;box-shadow:0 12px 30px -18px var(--card-accent)}
 .card-tile.is-selected{outline:2.5px solid #fff;outline-offset:3px}
 .card-tile.is-selected::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.05);pointer-events:none}
 .swatch{width:1.6rem;height:1.6rem;border-radius:.5rem;cursor:pointer;border:2px solid transparent;transition:transform .1s}
