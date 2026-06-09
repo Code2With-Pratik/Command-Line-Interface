@@ -1,7 +1,11 @@
 # CLIDesk 
+<img width="1917" height="936" alt="image" src="https://github.com/user-attachments/assets/a9f7d074-bce7-49c0-a797-022ed4651fb5" />
+
+<img width="1919" height="959" alt="image" src="https://github.com/user-attachments/assets/dd9d38e4-cc7a-4b30-b4a7-b7b11ea4ec06" />
 
 <img width="1919" height="1078" alt="image" src="https://github.com/user-attachments/assets/438d08e7-cc7e-4610-91d7-0bda311bb713" />
 
+<img width="1920" height="959" alt="image" src="https://github.com/user-attachments/assets/3d6130d8-b308-422c-b132-549854c3a399" />
 
 > Your personal, authenticated vault for **commands, shortcuts, snippets, websites, tools & links** — organised into boards, colour‑coded, searchable with `Ctrl/⌘ + K`, and exportable to images and PDFs.
 
