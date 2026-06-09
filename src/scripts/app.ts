@@ -335,6 +335,8 @@ const ICON = {
   alignJustify: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>',
   listBullet: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="3.5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="3.5" cy="18" r="1.4" fill="currentColor" stroke="none"/></svg>',
   mic: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg>',
+  copy: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  check: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
 };
 
 /* ====================== content rendering ========================== */
@@ -464,7 +466,7 @@ function cardHtml(c: Card): string {
   // Coloured border on a dark surface (not a fully coloured card).
   return `<article class="card-tile group relative rounded-2xl p-4 h-[210px] cursor-grab active:cursor-grabbing overflow-hidden flex flex-col ${suppressRise ? '' : 'animate-rise'} ${selectedCardIds.has(c.id) ? 'is-selected' : ''}"
       data-card="${c.id}"
-      style="background:linear-gradient(160deg, ${h}14, rgba(15,15,17,.92));border:1.5px solid ${h}80;box-shadow:0 12px 30px -18px ${h}, inset 0 1px 0 ${h}1f;">
+      style="--card-accent:${h};background:linear-gradient(160deg, ${h}14, rgba(15,15,17,.92));border:1.5px solid ${h}80;box-shadow:0 12px 30px -18px ${h}, inset 0 1px 0 ${h}1f;">
     <span class="absolute left-0 top-0 h-full w-1" style="background:${h}"></span>
     <div class="flex items-start gap-2 mb-2 pl-1.5">
       <h3 class="font-heading text-xl leading-snug flex-1 min-w-0 truncate text-mist-100" title="${esc(c.title)}">${esc(c.title)}</h3>
@@ -492,8 +494,15 @@ style.textContent = `
 .mini-btn{display:inline-flex;align-items:center;justify-content:center;width:1.85rem;height:1.85rem;border-radius:.55rem;color:#c8c8d2;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(6px);transition:background .15s,color .15s,transform .1s}
 .mini-btn:hover{background:rgba(0,0,0,.7);color:#fff}
 .mini-btn:active{transform:scale(.9)}
-.card-tile{transition:transform .16s ease, box-shadow .16s ease, outline-color .16s ease;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
-.card-tile:hover{transform:translateY(-3px)}
+.card-tile{transition:transform .16s ease, box-shadow .18s ease-out, outline-color .16s ease;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.card-tile:hover{
+  transform:translateY(-3px);
+  box-shadow:
+    var(--gx,0px) var(--gy,0px) 32px -6px var(--card-accent),
+    var(--gx,0px) var(--gy,0px) 66px -12px var(--card-accent),
+    0 18px 38px -24px rgba(0,0,0,.85) !important;
+}
+#card-grid.is-dragging .card-tile:hover{transform:none;box-shadow:0 12px 30px -18px var(--card-accent) !important}
 .card-tile.is-selected{outline:2.5px solid #fff;outline-offset:3px}
 .card-tile.is-selected::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.05);pointer-events:none}
 .swatch{width:1.6rem;height:1.6rem;border-radius:.5rem;cursor:pointer;border:2px solid transparent;transition:transform .1s}
@@ -849,6 +858,7 @@ function setModalView(mode: 'write' | 'preview') {
   wBtn.classList.toggle('text-mist-300', mode !== 'write');
   pBtn.classList.toggle('text-white', mode === 'preview');
   pBtn.classList.toggle('text-mist-300', mode !== 'preview');
+  document.getElementById('m-copy')?.classList.toggle('hidden', mode !== 'preview'); // copy lives in the Preview tab only
 }
 
 function openModal(cardId: string) {
@@ -934,12 +944,13 @@ function modalHtml(c: Card): string {
 
     <!-- body: compact Write/Preview switch (top-left) + single pane -->
     <div class="flex-1 min-h-0 px-4 sm:px-5 pt-3 pb-3 flex flex-col relative">
-      <div class="mb-2.5">
+      <div class="mb-2.5 flex items-center justify-between gap-2">
         <div class="relative grid grid-cols-2 w-40 p-0.5 rounded-lg bg-ink-800 border border-ink-600 text-sm">
           <span id="m-seg-slider" class="absolute top-0.5 left-0.5 bottom-0.5 w-[calc(50%-0.125rem)] rounded-md bg-ink-600 transition-transform duration-200 ease-out"></span>
           <button id="seg-write" class="relative z-10 py-1 font-heading text-center text-white">Write</button>
           <button id="seg-preview" class="relative z-10 py-1 font-heading text-center text-mist-300">Preview</button>
         </div>
+        <button id="m-copy" type="button" title="Copy preview text" class="icon-btn shrink-0 hidden">${ICON.copy}</button>
       </div>
       <div id="m-content" contenteditable="true" spellcheck="false" style="font-family:'${esc(fontOf(c))}'"
         data-ph="Type anything here. Select text to format it; paste a command and toggle Code."
@@ -1284,6 +1295,29 @@ function wireModal() {
   document.getElementById('seg-preview')?.addEventListener('click', () => setModalView('preview'));
   setModalView(modalView); // apply the current view
 
+  // copy the preview text to the clipboard (button shows only in the Preview tab)
+  const copyBtn = $('m-copy');
+  copyBtn.addEventListener('click', async () => {
+    const pv = document.getElementById('m-preview');
+    const text = ((pv as HTMLElement)?.innerText || htmlToPlain(c.content) || '').trim();
+    if (!text) { toast('Nothing to copy.', 'err'); return; }
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // fallback for non-secure contexts / older browsers
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch {}
+      ta.remove();
+    }
+    // brief tick feedback on the icon
+    copyBtn.innerHTML = ICON.check;
+    copyBtn.classList.add('!text-emerald-400');
+    toast('Copied to clipboard');
+    setTimeout(() => { copyBtn.innerHTML = ICON.copy; copyBtn.classList.remove('!text-emerald-400'); }, 1100);
+  });
+
   // ---------- dictation: speak-to-type into the editor ----------
   const dictateBtn = $('m-dictate');
   const waveEl = $('m-wave');
@@ -1596,6 +1630,26 @@ function wireGlobal() {
   $('tab-list').addEventListener('dblclick', (e) => {
     const row = (e.target as HTMLElement).closest('.tab-open') as HTMLElement | null;
     if (row) renameBoard(row.dataset.board!);
+  });
+
+  // cursor-tracking backlight: a coloured glow drifts behind the hovered card
+  const cardGrid = $('card-grid');
+  cardGrid.addEventListener('pointermove', (e) => {
+    if (cardGrid.classList.contains('is-dragging')) return;
+    const tile = (e.target as HTMLElement).closest('.card-tile') as HTMLElement | null;
+    if (!tile) return;
+    const r = tile.getBoundingClientRect();
+    const gx = Math.max(-26, Math.min(26, (e.clientX - r.left - r.width / 2) * 0.2));
+    const gy = Math.max(-26, Math.min(26, (e.clientY - r.top - r.height / 2) * 0.2));
+    tile.style.setProperty('--gx', `${gx.toFixed(1)}px`);
+    tile.style.setProperty('--gy', `${gy.toFixed(1)}px`);
+  });
+  cardGrid.addEventListener('pointerout', (e) => {
+    const tile = (e.target as HTMLElement).closest('.card-tile') as HTMLElement | null;
+    if (tile && !tile.contains(e.relatedTarget as Node)) {
+      tile.style.setProperty('--gx', '0px');
+      tile.style.setProperty('--gy', '0px');
+    }
   });
 
   // card grid delegation
